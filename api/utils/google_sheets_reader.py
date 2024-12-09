@@ -1,0 +1,81 @@
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+from api.models import Question, Category
+import json
+
+CATEGORY_MAPPING = {
+    "Basic Theory": 1,
+    "Computer System": 2,
+    "Technology Element": 3,
+    "Development Technology": 4,
+    "Project Management": 5,
+    "Service Management": 6,
+    "Business Strategy": 7,
+    "System Strategy": 8,
+    "Corporate and Legal Affairs": 9,
+}
+
+
+# Function to get the Google Sheets API service
+def get_google_sheets_service():
+    creds = service_account.Credentials.from_service_account_file(
+        'api/utils/credentials.json',
+        scopes=['https://www.googleapis.com/auth/spreadsheets.readonly'],
+    )
+    return build('sheets', 'v4', credentials=creds)
+
+
+# Function to get data from Google Sheets
+def get_sheet_data(spreadsheet_id, range_name):
+    try:
+        service = get_google_sheets_service()
+        sheet = service.spreadsheets()
+        result = sheet.values().get(spreadsheetId=spreadsheet_id, range=range_name).execute()
+        return result.get('values', [])
+    except HttpError as err:
+        print(f"Error fetching sheet data: {err}")
+        return None
+
+
+# Function to upload questions to the database
+def upload_questions_from_sheet(spreadsheet_id, range_name):
+    sheet_data = get_sheet_data(spreadsheet_id, range_name)
+
+    if sheet_data:
+        for row in sheet_data[1:]:
+            question_id = row[1]
+            question_text = row[2]
+            image_url = row[3] if len(row) > 3 else None
+            choices = [
+                row[4] if len(row) > 4 else '',
+                row[5] if len(row) > 5 else '',
+                row[6] if len(row) > 6 else '',
+                row[7] if len(row) > 7 else ''
+            ]
+            correct_answer = row[8] if len(row) > 8 else ''
+            category_name = row[9]
+            difficulty = float(row[10]) if len(row) > 10 else 0.0
+            discrimination = float(row[11]) if len(row) > 11 else 1.0
+            guessing = float(row[12]) if len(row) > 12 else 0.0
+
+            category_id = CATEGORY_MAPPING.get(category_name, None)
+            if category_id is None:
+                print(f"Category '{category_name}' not found.")
+                continue
+
+            category = Category.objects.get(id=category_id)
+
+            # Create the question
+            question = Question.objects.create(
+                id=question_id,
+                question_text=question_text,
+                image_url=image_url,
+                category=category,
+                difficulty=difficulty,
+                discrimination=discrimination,
+                guessing=guessing,
+                choices=choices,
+                correct_answer=correct_answer
+            )
+            print(f"Created question: {question.question_text}")
