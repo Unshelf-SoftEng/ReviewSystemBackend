@@ -2,14 +2,23 @@ from django.db import models
 
 # users/models.py
 from django.db import models
+from .utils.util import generate_class_code
 
 
 class User(models.Model):
+    # User roles
+    TEACHER = 'teacher'
+    STUDENT = 'student'
+    USER_ROLES = [
+        (TEACHER, 'Teacher'),
+        (STUDENT, 'Student'),
+    ]
+
     supabase_user_id = models.CharField(max_length=255, unique=True)
     email = models.EmailField(unique=True)
     first_name = models.CharField(max_length=255, null=True)
     last_name = models.CharField(max_length=255, null=True)
-    role = models.CharField(max_length=255, null=True)
+    role = models.CharField(max_length=255, choices=USER_ROLES, default=STUDENT)
 
     @property
     def full_name(self):
@@ -69,3 +78,18 @@ class Answer(models.Model):
 
     def __str__(self):
         return f'Answer for {self.question.question_text} by {self.exam_result.exam.user_id.email}'
+
+
+class Class(models.Model):
+    name = models.CharField(max_length=255)
+    teacher = models.ForeignKey('User', on_delete=models.CASCADE, limit_choices_to={'role': 'teacher'})
+    students = models.ManyToManyField('User', related_name='enrolled_classes', limit_choices_to={'role': 'student'})
+    class_code = models.CharField(max_length=8, unique=True, blank=True, editable=False)
+
+    def save(self, *args, **kwargs):
+        if not self.class_code:
+            self.class_code = generate_class_code()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name

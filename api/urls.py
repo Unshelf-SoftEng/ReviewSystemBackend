@@ -12,4 +12,12 @@ urlpatterns = [
     path('student/exam/<exam_id>/submit', views.submit_answers, name='submit_answers'),
 
     path('student/exam/<exam_id>/results', views.get_exam_results, name='get_exam_results'),
+
+    path('teacher/class', views.get_classes, name='get_classes'),
+
+    path('teacher/class/<class_id>', views.get_class, name='get_class'),
+
+    path('teacher/class/create', views.create_class, name='create_class'),
+
+    path('student/class/join', views.join_class, name='join_class'),
 ]
