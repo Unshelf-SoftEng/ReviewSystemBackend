@@ -10,7 +10,6 @@ from collections import defaultdict
 
 
 # Disable CSRF protection for this view (use cautiously)
-@csrf_exempt
 @api_view(['POST'])
 def register_user(request):
     if request.method == 'POST':
@@ -56,7 +55,6 @@ def register_user(request):
 
 # Login view (still incomplete, but here is the structure)
 @api_view(['POST'])
-@csrf_exempt
 def login_user(request):
     if request.method == 'POST':
         # Parse data from the request
@@ -80,6 +78,7 @@ def login_user(request):
             return Response({
                 'message': 'Login successful',
                 'jwt_token': auth_response.session.access_token,
+                'refresh_token': auth_response.session.refresh_token,
                 'role': role
             }, status=status.HTTP_200_OK)
 
@@ -89,6 +88,37 @@ def login_user(request):
                 return Response({'error': 'Email or Password is incorrect'}, status=status.HTTP_400_BAD_REQUEST)
 
             return Response({'error': f'Error: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+def refresh_token(request):
+    # Retrieve the refresh_token from the frontend request
+
+    ref_token = request.data.get('refresh_token')
+
+    if not ref_token:
+        return Response({'error': 'Refresh token is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Get the Supabase client
+    supabase = get_supabase_client()
+
+    try:
+        # Use the Supabase client to refresh the token
+        auth_response = supabase.auth.refresh_session(ref_token)
+
+        if auth_response:
+            # Extract new access and refresh tokens
+            new_access_token = auth_response.session.access_token
+
+            return Response({
+                'jwt_token': new_access_token,
+                'refresh_token': auth_response.session.refresh_token,
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({'error': 'Unable to refresh token'}, status=status.HTTP_400_BAD_REQUEST)
+
+    except Exception as e:
+        return Response({'error': f'Error: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # def reset_password(request):
@@ -191,7 +221,6 @@ def get_exam(request, exam_id):
 
 
 @api_view(['POST'])
-@csrf_exempt
 def submit_answers(request, exam_id):
     user_id = get_user_id_from_token(request)
     if not user_id:
@@ -293,6 +322,7 @@ def submit_answers(request, exam_id):
 @api_view(['GET'])
 def get_exam_results(request, exam_id):
     user_id = get_user_id_from_token(request)
+
     if not user_id:
         return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
 
@@ -421,7 +451,7 @@ def get_class(request, class_id):
         return Response({"error": "Only teachers can get classes"}, status=403)
 
     teacher_class = Class.objects.get(id=class_id)
-    student_names = [student.full_name() for student in teacher_class.students.all()]
+    student_names = [student.full_name for student in teacher_class.students.all()]
 
     data_result = {
         'class_id': class_id,
