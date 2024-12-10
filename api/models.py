@@ -51,16 +51,25 @@ class Question(models.Model):
         return self.question_text
 
 
-class Exam(models.Model):
+class Assessment(models.Model):
+    EXAM = 'exam'
+    QUIZ = 'quiz'
+    ASSESSMENT_TYPES = [
+        (EXAM, 'EXAM'),
+        (QUIZ, 'QUIZ'),
+    ]
+
     user = models.ForeignKey('User', on_delete=models.CASCADE)
     questions = models.ManyToManyField("Question", related_name="exams")
+    type = models.CharField(max_length=255, choices=ASSESSMENT_TYPES)
+    selected_categories = models.ManyToManyField(Category, blank=True)
 
     def __str__(self):
         return f"Exam for {self.user.email}"
 
 
-class ExamResult(models.Model):
-    exam = models.ForeignKey(Exam, on_delete=models.CASCADE)
+class AssessmentResult(models.Model):
+    assessment = models.ForeignKey(Assessment, on_delete=models.CASCADE)
     score = models.IntegerField(default=0)
     time_taken = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -70,7 +79,7 @@ class ExamResult(models.Model):
 
 
 class Answer(models.Model):
-    exam_result = models.ForeignKey(ExamResult, related_name='answers', on_delete=models.CASCADE)
+    exam_result = models.ForeignKey(AssessmentResult, related_name='answers', on_delete=models.CASCADE)
     question = models.ForeignKey(Question, related_name='question', on_delete=models.CASCADE)
     time_spent = models.IntegerField(default=0)
     chosen_answer = models.CharField(max_length=255)

@@ -1,12 +1,12 @@
 from rest_framework import status
 from rest_framework.decorators import api_view
-from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from .utils.supabase_client import get_supabase_client
 import random, json
-from .models import User, Question, Exam, Answer, ExamResult, Class
+from .models import User, Question, Assessment, Answer, AssessmentResult, Class
 from collections import defaultdict
+from .ai.estimate_student_ability import estimate_student_ability_per_category
 
 
 # Disable CSRF protection for this view (use cautiously)
@@ -164,12 +164,12 @@ def take_exam(request):
     if not all_questions:
         return Response({'error': 'No questions available to generate an exam.'}, status=status.HTTP_404_NOT_FOUND)
 
-    selected_questions = random.sample(list(all_questions), 5)
+    selected_questions = random.sample(list(all_questions), 60)
 
     user = User.objects.get(supabase_user_id=user_id)
 
     # Create a new exam instance for the authenticated user
-    exam = Exam.objects.create(user=user)
+    exam = Assessment.objects.create(user=user)
 
     exam.questions.set(selected_questions)
 
@@ -200,7 +200,7 @@ def get_exam(request, exam_id):
         return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
 
     # Get the exam or return a 404 if not found
-    exam = get_object_or_404(Exam, id=exam_id)
+    exam = get_object_or_404(AssessmentResult, id=exam_id)
 
     # Prepare exam data, including questions
     exam_data = {
@@ -227,7 +227,7 @@ def submit_answers(request, exam_id):
         return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
 
     # Retrieve the exam object; ensure that the exam belongs to the authenticated user
-    exam = get_object_or_404(Exam, id=exam_id)
+    exam = get_object_or_404(AssessmentResult, id=exam_id)
     if exam.user.supabase_user_id != user_id:
         return Response({'error': 'You are not authorized to submit answers for this exam.'},
                         status=status.HTTP_403_FORBIDDEN)
@@ -243,7 +243,7 @@ def submit_answers(request, exam_id):
     overall_wrong_answers = 0
 
     # Create an ExamResult object to store the exam results
-    exam_result = ExamResult.objects.create(
+    exam_result = AssessmentResult.objects.create(
         exam=exam,
         score=score,
         time_taken=total_time_spent
@@ -327,12 +327,12 @@ def get_exam_results(request, exam_id):
         return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
 
     # Retrieve the exam object; ensure that the exam belongs to the authenticated user
-    exam = get_object_or_404(Exam, id=exam_id)
+    exam = get_object_or_404(AssessmentResult, id=exam_id)
     if exam.user.supabase_user_id != user_id:
         return Response({'error': 'You are not authorized to submit answers for this exam.'},
                         status=status.HTTP_403_FORBIDDEN)
 
-    exam_results = ExamResult.objects.get(exam=exam)
+    exam_results = AssessmentResult.objects.get(exam=exam)
 
     answers = Answer.objects.filter(exam_result=exam_results)
 
@@ -377,7 +377,6 @@ def get_exam_results(request, exam_id):
 
 
 @api_view(['POST'])
-@csrf_exempt
 def create_class(request):
     if request.method == 'POST':
 
@@ -407,7 +406,6 @@ def create_class(request):
 
 
 @api_view(['GET'])
-@csrf_exempt
 def get_classes(request):
     user_id = get_user_id_from_token(request)
 
@@ -435,7 +433,6 @@ def get_classes(request):
 
 
 @api_view(['GET'])
-@csrf_exempt
 def get_class(request, class_id):
     if not class_id:
         return Response({'error': 'Class id is required'}, status=400)
@@ -466,7 +463,6 @@ def get_class(request, class_id):
 
 @api_view(['POST'])
 def join_class(request):
-
     data = request.data
 
     # Step 1: Get the student based on the authentication (assuming you get user info from token)
@@ -494,3 +490,57 @@ def join_class(request):
 
     # Step 4: Return success response
     return Response({'message': 'Successfully joined the class.'}, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+def take_quiz(request):
+    user_id = get_user_id_from_token(request)
+    data = request.data
+
+    if not user_id:
+        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    categories = data.get('selected_categories')
+
+    # Get all questions from the database
+    all_questions = Question.objects.filter(category_id__in=categories)
+
+    if not all_questions:
+        return Response({'error': 'No questions available to generate an exam.'}, status=status.HTTP_404_NOT_FOUND)
+
+    selected_questions = random.sample(list(all_questions), data.get('no_of_questions'))
+
+    user = User.objects.get(supabase_user_id=user_id)
+
+    # Create a new exam instance for the authenticated user
+    quiz = Assessment.objects.create(user=user, type='Quiz')
+
+    quiz.questions.set(selected_questions)
+    quiz.selected_categories.set(categories)
+
+    quiz.save()
+
+    # Format the questions and answers to send back to the frontend
+    exam_data = {
+        'quiz_id': quiz.id,
+        'questions': [
+            {
+                'question_id': question.id,
+                'image_url': question.image_url,
+                'question_text': question.question_text,
+                'choices': question.choices
+            }
+            for question in selected_questions
+        ]
+
+    }
+
+    return Response(exam_data, status=status.HTTP_200_OK)
+
+
+
+
+
+@api_view(['GET'])
+def estimate_ability(request):
+    print(estimate_student_ability_per_category(2))

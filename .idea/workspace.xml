@@ -4,10 +4,15 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d83e15d4-b2c8-4a76-9aca-4b58469163cd" name="Changes" comment="feat: Add class management API&#10;&#10;- Implement API endpoints for class creation and retrieving all classes&#10;- Add functionality to generate unique class codes for student enrollment&#10;- Implement API endpoint for students to join classes using class code">
+    <list default="true" id="d83e15d4-b2c8-4a76-9aca-4b58469163cd" name="Changes" comment="feat: Add endpoints for refreshing JWT token">
+      <change afterPath="$PROJECT_DIR$/api/ai/estimate_student_ability.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ReviewSystemBackend/settings.py" beforeDir="false" afterPath="$PROJECT_DIR$/ReviewSystemBackend/settings.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/api/models.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/models.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/api/urls.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/urls.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/api/views.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/views.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -27,43 +32,43 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
-  "lastFilter": {
-    "state": "OPEN",
-    "assignee": "johnivanpuayap"
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;johnivanpuayap&quot;
   }
-}]]></component>
-  <component name="GithubPullRequestsUISettings"><![CDATA[{
-  "selectedUrlAndAccountId": {
-    "url": "https://github.com/johnivanpuayap/ReviewSystemBackend",
-    "accountId": "b3b52d43-f4a2-470d-b82d-ffb56b7d2fd9"
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/johnivanpuayap/ReviewSystemBackend&quot;,
+    &quot;accountId&quot;: &quot;b3b52d43-f4a2-470d-b82d-ffb56b7d2fd9&quot;
   }
-}]]></component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 7
-}]]></component>
+}</component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 7
+}</component>
   <component name="ProjectId" id="2pyNFGsH3trqijdwRnfmkWBWBNz" />
   <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Django Server.ReviewSystemBackend.executor": "Run",
-    "RunOnceActivity.OpenDjangoStructureViewOnStart": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.pycharm.django.structure.promotion.once.per.project": "true",
-    "git-widget-placeholder": "main",
-    "last_opened_file_path": "C:/Users/johni/Coding/ReviewSystemBackend/api/utils",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Django Server.ReviewSystemBackend.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.OpenDjangoStructureViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.pycharm.django.structure.promotion.once.per.project&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/johni/Coding/ReviewSystemBackend/api/utils&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="C:\Users\johni\Coding\ReviewSystemBackend\api\utils" />
@@ -116,7 +121,8 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1733734249228</updated>
-      <workItem from="1733734250630" duration="31802000" />
+      <workItem from="1733734250630" duration="34188000" />
+      <workItem from="1733793670139" duration="4636000" />
     </task>
     <task id="LOCAL-00001" summary="feat: Add login and registration using Supabase">
       <option name="closed" value="true" />
@@ -166,7 +172,15 @@
       <option name="project" value="LOCAL" />
       <updated>1733765654540</updated>
     </task>
-    <option name="localTasksCounter" value="7" />
+    <task id="LOCAL-00007" summary="feat: Add endpoints for refreshing JWT token">
+      <option name="closed" value="true" />
+      <created>1733769689892</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1733769689892</updated>
+    </task>
+    <option name="localTasksCounter" value="8" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -197,6 +211,7 @@
     <MESSAGE value="feat: Add endpoints for taking exams, submitting scores, and fetching results" />
     <MESSAGE value="chore: Deploy backend on Railway&#10;&#10;- Ensured the app is accessible via the domain." />
     <MESSAGE value="feat: Add class management API&#10;&#10;- Implement API endpoints for class creation and retrieving all classes&#10;- Add functionality to generate unique class codes for student enrollment&#10;- Implement API endpoint for students to join classes using class code" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: Add class management API&#10;&#10;- Implement API endpoints for class creation and retrieving all classes&#10;- Add functionality to generate unique class codes for student enrollment&#10;- Implement API endpoint for students to join classes using class code" />
+    <MESSAGE value="feat: Add endpoints for refreshing JWT token" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: Add endpoints for refreshing JWT token" />
   </component>
 </project>
