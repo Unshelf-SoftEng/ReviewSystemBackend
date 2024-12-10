@@ -29,6 +29,7 @@ ALLOWED_HOSTS = ['reviewsystembackend-production.up.railway.app', 'your-domain.c
 # Application definition
 
 INSTALLED_APPS = [
+    'corsheaders',
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -128,5 +129,12 @@ STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-CORS_ALLOWED_ORIGINS = True
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5173",
+    "https://yourfrontend.com",  # Production frontend
+]
+
 CORS_ALLOW_CREDENTIALS = True
