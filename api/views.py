@@ -200,7 +200,7 @@ def get_exam(request, exam_id):
         return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
 
     # Get the exam or return a 404 if not found
-    exam = get_object_or_404(AssessmentResult, id=exam_id)
+    exam = get_object_or_404(Assessment, id=exam_id)
 
     # Prepare exam data, including questions
     exam_data = {
@@ -327,12 +327,12 @@ def get_exam_results(request, exam_id):
         return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
 
     # Retrieve the exam object; ensure that the exam belongs to the authenticated user
-    exam = get_object_or_404(AssessmentResult, id=exam_id)
+    exam = get_object_or_404(Assessment, id=exam_id)
     if exam.user.supabase_user_id != user_id:
         return Response({'error': 'You are not authorized to submit answers for this exam.'},
                         status=status.HTTP_403_FORBIDDEN)
 
-    exam_results = AssessmentResult.objects.get(exam=exam)
+    exam_results = AssessmentResult.objects.get(assessment=exam)
 
     answers = Answer.objects.filter(exam_result=exam_results)
 
@@ -536,8 +536,6 @@ def take_quiz(request):
     }
 
     return Response(exam_data, status=status.HTTP_200_OK)
-
-
 
 
 
