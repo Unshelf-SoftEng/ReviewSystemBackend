@@ -169,7 +169,7 @@ def take_exam(request):
     user = User.objects.get(supabase_user_id=user_id)
 
     # Create a new exam instance for the authenticated user
-    exam = Assessment.objects.create(user=user)
+    exam = Assessment.objects.create(user=user, type='Exam')
 
     exam.questions.set(selected_questions)
 
@@ -227,7 +227,8 @@ def submit_answers(request, exam_id):
         return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
 
     # Retrieve the exam object; ensure that the exam belongs to the authenticated user
-    exam = get_object_or_404(AssessmentResult, id=exam_id)
+    exam = get_object_or_404(Assessment, id=exam_id)
+
     if exam.user.supabase_user_id != user_id:
         return Response({'error': 'You are not authorized to submit answers for this exam.'},
                         status=status.HTTP_403_FORBIDDEN)
@@ -244,7 +245,7 @@ def submit_answers(request, exam_id):
 
     # Create an ExamResult object to store the exam results
     exam_result = AssessmentResult.objects.create(
-        exam=exam,
+        assessment=exam,
         score=score,
         time_taken=total_time_spent
     )
@@ -288,7 +289,7 @@ def submit_answers(request, exam_id):
         total_time_spent += time_spent
 
     # Create an ExamResult object to store the exam results
-    exam_result.score = total_time_spent
+    exam_result.score = overall_correct_answers
     exam_result.time_taken = total_time_spent
 
     exam_result.save()
@@ -309,11 +310,10 @@ def submit_answers(request, exam_id):
         'exam_id': exam.id,
         'student_id': user_id,
         'total_time_taken_seconds': total_time_spent,
-        'score': score,
-        'categories': categories,
         'overall_correct_answers': overall_correct_answers,
         'overall_wrong_answers': overall_wrong_answers,
-        'total_questions': len(answers)  # Total number of questions answered
+        'total_questions': len(answers),
+        'categories': categories,
     }
 
     return Response(result_data, status=status.HTTP_200_OK)
@@ -543,4 +543,5 @@ def take_quiz(request):
 
 @api_view(['GET'])
 def estimate_ability(request):
-    print(estimate_student_ability_per_category(2))
+
+    return Response(estimate_student_ability_per_category(4), status=status.HTTP_200_OK)

@@ -46,9 +46,10 @@ def estimate_student_ability_per_category(exam_result_id):
     categories = {}
     for answer in answers:
         category = answer.question.category  # Assume a 'category' field exists in Question
-        if category not in categories:
-            categories[category] = []
-        categories[category].append(answer)
+        category_key = str(category)  # Convert category to a string (e.g., name or id)
+        if category_key not in categories:
+            categories[category_key] = []
+        categories[category_key].append(answer)
 
     # Function to optimize theta per category
     def estimate_theta_for_answers(answers):
