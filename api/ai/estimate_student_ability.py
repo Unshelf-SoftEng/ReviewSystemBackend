@@ -45,8 +45,8 @@ def estimate_student_ability_per_category(exam_result_id):
     # Group answers by category
     categories = {}
     for answer in answers:
-        category = answer.question.category  # Assume a 'category' field exists in Question
-        category_key = str(category)  # Convert category to a string (e.g., name or id)
+        category = answer.question.category
+        category_key = str(category)
         if category_key not in categories:
             categories[category_key] = []
         categories[category_key].append(answer)

@@ -134,7 +134,7 @@ def refresh_token(request):
 #
 #     password = data.get('password')
 #     get_supabase_client().update_user({'password': password})
-
+#
 
 def get_user_id_from_token(request):
     """Helper function to extract the user ID from the Supabase JWT token."""
@@ -502,7 +502,7 @@ def take_quiz(request):
 
     categories = data.get('selected_categories')
 
-    # Get all questions from the database
+    # Get all questions from the category
     all_questions = Question.objects.filter(category_id__in=categories)
 
     if not all_questions:
@@ -521,7 +521,7 @@ def take_quiz(request):
     quiz.save()
 
     # Format the questions and answers to send back to the frontend
-    exam_data = {
+    quiz_data = {
         'quiz_id': quiz.id,
         'questions': [
             {
@@ -532,10 +532,9 @@ def take_quiz(request):
             }
             for question in selected_questions
         ]
-
     }
 
-    return Response(exam_data, status=status.HTTP_200_OK)
+    return Response(quiz_data, status=status.HTTP_200_OK)
 
 
 
