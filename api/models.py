@@ -36,6 +36,18 @@ class Category(models.Model):
         return self.name
 
 
+class UserAbility(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    category = models.ForeignKey(Category, on_delete=models.CASCADE)
+    ability_level = models.IntegerField(default=0)
+
+    class Meta:
+        unique_together = (('user', 'category'),)
+
+    def __str__(self):
+        return f"{self.user.email} - {self.category.name} - {self.ability_level}"
+
+
 class Question(models.Model):
     id = models.CharField(max_length=10, unique=True, primary_key=True)
     question_text = models.CharField()
@@ -86,7 +98,7 @@ class Answer(models.Model):
     is_correct = models.BooleanField(default=False)
 
     def __str__(self):
-        return f'Answer for {self.question.question_text} by {self.exam_result.exam.user_id.email}'
+        return f'Answer for {self.question.question_text} by {self.exam_result.assessment.user.email}'
 
 
 class Class(models.Model):
