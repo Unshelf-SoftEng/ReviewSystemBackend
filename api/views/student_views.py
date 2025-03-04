@@ -1,12 +1,10 @@
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from ..utils.supabase_client import get_supabase_client
-import random, json
-from ..models import User, Question, Assessment, Answer, AssessmentResult, Class, UserAbility
+import random
+from ..models import User, Question, Assessment, Answer, AssessmentResult, UserAbility, Category, Class
 from collections import defaultdict
 from ..ai.estimate_student_ability import estimate_student_ability_per_category
-from ..ai.rl_agent import DQNAgent
 from api.views.general_views import get_user_id_from_token
 from django.shortcuts import get_object_or_404
 
@@ -43,10 +41,11 @@ def take_exam(request):
                 'question_id': question.id,
                 'image_url': question.image_url,
                 'question_text': question.question_text,
-                'choices': question.choices
+                'choices': list(question.choices.values()),
             }
             for question in selected_questions
-        ]
+        ],
+        'question_ids': [question.id for question in selected_questions],
     }
 
     return Response(exam_data, status=status.HTTP_200_OK)
@@ -54,7 +53,6 @@ def take_exam(request):
 
 @api_view(['POST'])
 def submit_exam(request, exam_id):
-
     user_id = get_user_id_from_token(request)
 
     if not user_id:
@@ -73,10 +71,11 @@ def submit_exam(request, exam_id):
 
     # Initialize tracking variables
     score = 0
-    total_time_spent = data.get('total_time_spent', 0)
-    overall_correct_answers = 0
-    overall_wrong_answers = 0
-    category_stats = defaultdict(lambda: {'correct_answers': 0, 'wrong_answers': 0, 'total_questions': 0})
+
+    check_if_exists = AssessmentResult.objects.filter(assessment_id=exam_id).exists()
+
+    if check_if_exists:
+        return Response({'error': 'Exam was already taken.'}, status=status.HTTP_400_BAD_REQUEST)
 
     # Create an AssessmentResult object
     exam_result = AssessmentResult.objects.create(
@@ -94,21 +93,12 @@ def submit_exam(request, exam_id):
         question = get_object_or_404(Question, id=question_id)
 
         # Check if the chosen answer is correct
-
         correct_answer = question.choices[question.correct_answer]
 
         is_correct = chosen_answer == correct_answer
 
-        # Update category stats
-        category = question.category
-        category_stats[category.name]['total_questions'] += 1
         if is_correct:
-            category_stats[category.name]['correct_answers'] += 1
-            overall_correct_answers += 1
-            score += 1  # Increment score if correct
-        else:
-            category_stats[category.name]['wrong_answers'] += 1
-            overall_wrong_answers += 1
+            score += 1
 
         # Save answer to the database
         Answer.objects.create(
@@ -119,13 +109,16 @@ def submit_exam(request, exam_id):
             is_correct=is_correct
         )
 
-    # Update exam result with the final score and time taken
-    exam_result.score = overall_correct_answers
-    exam_result.time_taken = total_time_spent
+    exam_result.score = score
+    exam_result.time_taken = data.get('total_time_taken_seconds', 0)
     exam_result.save()
 
-    return Response({'message': 'Exam submitted successfully.', 'exam_result_id': exam_result.id},
-                    status=status.HTTP_201_CREATED)
+    int_id = User.objects.get(supabase_user_id=user_id).id
+
+    estimate_student_ability_per_category(int_id)
+
+    return Response({'message': 'Exam submitted successfully.'}, status=status.HTTP_201_CREATED)
+
 
 @api_view(['GET'])
 def get_exam_results(request, exam_id):
@@ -162,7 +155,9 @@ def get_exam_results(request, exam_id):
 
         serialized_answers.append({
             'question_id': answer.question.id,
-            'question_text': answer.question.text,
+            'question_text': answer.question.question_text,
+            'choices': list(answer.question.choices.values()),
+            'correct_answer': answer.question.choices[answer.question.correct_answer],
             'chosen_answer': answer.chosen_answer,
             'is_correct': answer.is_correct,
             'time_spent': answer.time_spent,
@@ -194,21 +189,29 @@ def get_exam_results(request, exam_id):
 
 
 @api_view(['GET'])
-def get_student_abilities(request):
+def get_ability(request):
     user_id = get_user_id_from_token(request)
 
     if not user_id:
         return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
 
-    # Query the UserAbility model for the user's abilities
-    user_abilities = UserAbility.objects.filter(user_id=user_id)
+    try:
+        int_id = User.objects.get(supabase_user_id=user_id).id
+    except User.DoesNotExist:
+        return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    # Prepare a dictionary of categories and their associated ability levels
-    abilities = {}
-    for user_ability in user_abilities:
-        abilities[user_ability.category.name] = user_ability.ability_level
+    int_id = User.objects.get(supabase_user_id=user_id).id
+    estimate_student_ability_per_category(int_id)
 
-    return Response(estimate_student_ability_per_category(user_id), status=status.HTTP_200_OK)
+    # Retrieve stored abilities
+    user_abilities = UserAbility.objects.filter(user_id=int_id)
+    stored_abilities = {
+        user_ability.category.name: user_ability.ability_level for user_ability in user_abilities
+    }
+
+    return Response({
+        "abilities": stored_abilities,
+    }, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
@@ -254,3 +257,60 @@ def take_quiz(request):
     }
 
     return Response(quiz_data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+def get_lessons(request):
+    user_id = get_user_id_from_token(request)
+
+    if not user_id:
+        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    # Fetch all category names
+    categories = Category.objects.values_list('name', flat=True)
+
+    return Response({'titles': list(categories)}, status=status.HTTP_200_OK)
+
+
+# TODO
+@api_view(['GET'])
+def get_lesson(request, lesson_id):
+    user_id = get_user_id_from_token(request)
+
+    if not user_id:
+        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    return Response({'lesson_id': lesson_id}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@api_view(['POST'])
+def join_class(request):
+    user_id = get_user_id_from_token(request)
+
+    if not user_id:
+        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    # Get the user instance
+    try:
+        user = User.objects.get(supabase_user_id=user_id)
+    except User.DoesNotExist:
+        return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    data = request.data
+    code = data.get('code')
+
+    if not code:
+        return Response({'error': 'Class code is required.'}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        class_instance = Class.objects.get(class_code=code)  # Fetch class with the given code
+    except Class.DoesNotExist:
+        return Response({'error': 'Invalid class code.'}, status=status.HTTP_404_NOT_FOUND)
+
+    if class_instance.students.filter(id=user_id).exists():
+        return Response({'message': 'You are already a member of this class.'}, status=status.HTTP_200_OK)
+
+    # Add the user to the class
+    class_instance.students.add(user)
+
+    return Response({'message': 'Successfully joined the class.'}, status=status.HTTP_200_OK)

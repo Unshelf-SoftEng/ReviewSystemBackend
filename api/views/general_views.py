@@ -1,7 +1,7 @@
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from ..utils.supabase_client import  get_supabase_client
+from ..utils.supabase_client import get_supabase_client
 from ..models import User
 
 @api_view(['POST'])

@@ -11,7 +11,6 @@ urlpatterns = [
 
     path('refresh-token/', refresh_token, name='refresh_token'),
 
-
     # Student Views
     path('student/exam/take', take_exam, name='take_exam'),
 
@@ -19,9 +18,9 @@ urlpatterns = [
 
     path('student/exam/<exam_id>', get_exam_results, name='get_exam_results'),
 
-    path('student/quiz/take', take_quiz, name='take_quiz'),
+    path('student/ability', get_ability, name='get_student_abilities'),
 
-    path('student/abilities', get_student_abilities, name='get_student_abilities'),
+    path('student/quiz/take', take_quiz, name='take_quiz'),
 
     path('lessons', get_lessons_overall, name='get_lessons_overall'),
 
