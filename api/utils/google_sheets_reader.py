@@ -72,23 +72,32 @@ def upload_questions_from_sheet(spreadsheet_id, range_name):
 
             category = Category.objects.get(id=category_id)
 
-            # **Check if question ID exists**
             existing_question = Question.objects.filter(id=question_id).first()
 
             if existing_question:
-                print(f"Skipping: Question with ID {question_id} already exists.")
-                continue  # Skip adding duplicate question
+                Question.objects.filter(id=question_id).update(
+                    question_text=question_text,
+                    image_url=image_url,
+                    category=category,
+                    difficulty=difficulty,
+                    discrimination=discrimination,
+                    guessing=guessing,
+                    choices=choices,
+                    correct_answer=correct_answer
+                )
 
-            # Create the question if it does not exist
-            question = Question.objects.create(
-                id=question_id,
-                question_text=question_text,
-                image_url=image_url,
-                category=category,
-                difficulty=difficulty,
-                discrimination=discrimination,
-                guessing=guessing,
-                choices=choices,
-                correct_answer=correct_answer
-            )
-            print(f"Created question: {question.question_text}")
+                print('Updated Question', question_id)
+
+            else:
+                # Create the question if it does not exist
+                Question.objects.create(
+                    id=question_id,
+                    question_text=question_text,
+                    image_url=image_url,
+                    category=category,
+                    difficulty=difficulty,
+                    discrimination=discrimination,
+                    guessing=guessing,
+                    choices=choices,
+                    correct_answer=correct_answer
+                )

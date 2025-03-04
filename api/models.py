@@ -39,7 +39,7 @@ class Category(models.Model):
 class UserAbility(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     category = models.ForeignKey(Category, on_delete=models.CASCADE)
-    ability_level = models.IntegerField(default=0)
+    ability_level = models.FloatField()
 
     class Meta:
         unique_together = (('user', 'category'),)
