@@ -4,6 +4,7 @@ from django.db import models
 from django.db import models
 from .utils.util import generate_class_code
 
+
 class User(models.Model):
     # User roles
     TEACHER = 'teacher'
@@ -86,7 +87,7 @@ class AssessmentResult(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f'{self.exam.user.full_name} - {self.exam} - {self.score}'
+        return f'{self.assessment.user.full_name} - {self.assessment} - {self.score}'
 
 
 class Answer(models.Model):
@@ -113,3 +114,7 @@ class Class(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class Lesson(models.Model):
+    lesson_name = models.CharField(max_length=255)

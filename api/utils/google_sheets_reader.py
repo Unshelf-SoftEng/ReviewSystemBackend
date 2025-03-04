@@ -44,17 +44,23 @@ def upload_questions_from_sheet(spreadsheet_id, range_name):
 
     if sheet_data:
         for row in sheet_data[1:]:
+            print("Length of Row: ", len(row))
+            if len(row) < 2 or not row[0]:  # Ensure the row has a valid ID
+                print("Skipping empty or incomplete row:", row)
+                continue
+
             question_id = row[1]
-            question_text = row[2]
+            question_text = row[2] if len(row) > 2 else ''
             image_url = row[3] if len(row) > 3 else None
-            choices = [
-                row[4] if len(row) > 4 else '',
-                row[5] if len(row) > 5 else '',
-                row[6] if len(row) > 6 else '',
-                row[7] if len(row) > 7 else ''
-            ]
+
+            choices = {
+                'a': row[4] if len(row) > 4 else '',
+                'b': row[5] if len(row) > 5 else '',
+                'c': row[6] if len(row) > 6 else '',
+                'd': row[7] if len(row) > 7 else ''
+            }
             correct_answer = row[8] if len(row) > 8 else ''
-            category_name = row[9]
+            category_name = row[9] if len(row) > 9 else ''
             difficulty = float(row[10]) if len(row) > 10 else 0.0
             discrimination = float(row[11]) if len(row) > 11 else 1.0
             guessing = float(row[12]) if len(row) > 12 else 0.0
@@ -66,7 +72,14 @@ def upload_questions_from_sheet(spreadsheet_id, range_name):
 
             category = Category.objects.get(id=category_id)
 
-            # Create the question
+            # **Check if question ID exists**
+            existing_question = Question.objects.filter(id=question_id).first()
+
+            if existing_question:
+                print(f"Skipping: Question with ID {question_id} already exists.")
+                continue  # Skip adding duplicate question
+
+            # Create the question if it does not exist
             question = Question.objects.create(
                 id=question_id,
                 question_text=question_text,

@@ -23,6 +23,9 @@ urlpatterns = [
 
     path('student/abilities', get_student_abilities, name='get_student_abilities'),
 
+    path('lessons', get_lessons_overall, name='get_lessons_overall'),
+
+    path('lessons/lesson_id', get_lesson, name='get_lesson'),
 
     # Teacher Views
 

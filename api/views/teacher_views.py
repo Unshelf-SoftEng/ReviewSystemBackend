@@ -1,13 +1,10 @@
 from rest_framework import status
 from rest_framework.decorators import api_view
-from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
-from ..utils.supabase_client import get_supabase_client
-import random, json
-from ..models import User, Question, Assessment, Answer, AssessmentResult, Class, UserAbility
-from collections import defaultdict
+from ..models import User, Class
 
-from general_views import get_user_id_from_token
+
+from api.views.general_views import get_user_id_from_token
 
 @api_view(['POST'])
 def create_class(request):

@@ -4,7 +4,6 @@ from rest_framework.response import Response
 from ..utils.supabase_client import  get_supabase_client
 from ..models import User
 
-
 @api_view(['POST'])
 def register_user(request):
     if request.method == 'POST':
@@ -139,8 +138,38 @@ def reset_password(request):
         options={'redirect_to': 'https://localhost:3000/update_password/'}
     )
 
+
 def update_password(request):
     data = request.data
 
     password = data.get('password')
     get_supabase_client().update_user({'password': password})
+
+
+
+@api_view(['GET'])
+def get_lessons_overall(request):
+
+    user_id = get_user_id_from_token(request)
+
+    if not user_id:
+        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    lesson_titles = {
+        "titles": ['Basic Theory', 'Computer System', 'Technology Element', 'Development Technology', 'Project Management', 'Service Management', 'Business Strategy', 'System Strategy', 'Corporate and Legal Affairs']
+    }
+
+    return Response(lesson_titles, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+def get_lesson(request, lesson_id):
+
+    user_id = get_user_id_from_token(request)
+
+    if not user_id:
+        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    lesson = {}
+
+    return Response(lesson, status=status.HTTP_200_OK)
