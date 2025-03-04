@@ -4,7 +4,6 @@ from django.db import models
 from django.db import models
 from .utils.util import generate_class_code
 
-
 class User(models.Model):
     # User roles
     TEACHER = 'teacher'

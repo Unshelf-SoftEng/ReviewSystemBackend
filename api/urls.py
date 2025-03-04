@@ -1,31 +1,37 @@
 from django.urls import path
-from . import views
+from .views import *
 
 urlpatterns = [
-    path('register/', views.register_user, name='register_user'),
-    path('login/', views.login_user, name='login_user'),
+
+    # General Views
+    path('register/', register_user, name='register_user'),
+    path('login/', login_user, name='login_user'),
 
     # path('logout/', views.logout_user, name='logout_user'),
 
-    path('refresh-token/', views.refresh_token, name='refresh_token'),
+    path('refresh-token/', refresh_token, name='refresh_token'),
 
-    path('student/exam/take', views.take_exam, name='take_exam'),
 
-    path('student/exam/<exam_id>', views.get_exam, name='get_exam'),
+    # Student Views
+    path('student/exam/take', take_exam, name='take_exam'),
 
-    path('student/exam/<exam_id>/submit', views.submit_answers, name='submit_answers'),
+    path('student/exam/<exam_id>/submit', submit_exam, name='submit_answers'),
 
-    path('student/exam/<exam_id>/results', views.get_exam_results, name='get_exam_results'),
+    path('student/exam/<exam_id>', get_exam_results, name='get_exam_results'),
 
-    path('student/quiz/take', views.take_quiz, name='take_quiz'),
+    path('student/quiz/take', take_quiz, name='take_quiz'),
 
-    path('teacher/class', views.get_classes, name='get_classes'),
+    path('student/abilities', get_student_abilities, name='get_student_abilities'),
 
-    path('teacher/class/<class_id>', views.get_class, name='get_class'),
 
-    path('teacher/class/create', views.create_class, name='create_class'),
+    # Teacher Views
 
-    path('student/class/join', views.join_class, name='join_class'),
+    path('teacher/class', get_classes, name='get_classes'),
 
-    path('estimate_ability/', views.estimate_ability, name='estimate_ability'),
+    path('teacher/class/<class_id>', get_class, name='get_class'),
+
+    path('teacher/class/create', create_class, name='create_class'),
+
+    path('student/class/join', join_class, name='join_class'),
+
 ]

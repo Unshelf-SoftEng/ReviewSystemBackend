@@ -10,19 +10,9 @@ from api.models import Question  # Import Django model
 
 
 class DQNAgent:
-    """
-    A Deep Q-Network (DQN) agent for optimizing quiz question selection.
-    """
 
     def __init__(self, state_size, action_size, ability_estimate=None):
-        """
-        Initializes the DQN agent with the given ability estimate.
 
-        Args:
-        state_size: The size of the state vector (e.g., learner's ability in each category).
-        action_size: The number of possible actions (question sets).
-        ability_estimate: The learner's initial ability estimate from the IRT model (default: None).
-        """
         self.state_size = state_size  # Size of the state vector
         self.action_size = action_size  # Number of possible actions (question sets)
         self.memory = deque(maxlen=2000)  # Memory buffer for experience replay
@@ -43,9 +33,6 @@ class DQNAgent:
         self.remember([], 0, self.state, done=True)
 
     def _build_model(self):
-        """
-        Builds the neural network model for the DQN.
-        """
         model = Sequential()
         model.add(Input(shape=(self.state_size,)))
         model.add(Dense(24, activation='relu'))
@@ -55,9 +42,6 @@ class DQNAgent:
         return model
 
     def remember(self, action, reward, next_state, done):
-        """
-        Stores experiences in the memory buffer for experience replay.
-        """
         self.memory.append((self.state, action, reward, next_state, done))
 
     def act(self, question_probs):
@@ -80,6 +64,10 @@ class DQNAgent:
 
         # Weight by the actual question probabilities
         weighted_q_values = q_values * prob_values
+
+        # Ensure weighted_q_values is a 1D array before using np.argmax
+        weighted_q_values = np.asarray(weighted_q_values).flatten()
+
         selected_index = np.argmax(weighted_q_values)
 
         return question_ids[selected_index]
@@ -232,3 +220,4 @@ def update_rl_model(rl_agent, responses, batch_size=32):
     rl_agent.state = next_state
 
     return updated_theta_k
+
