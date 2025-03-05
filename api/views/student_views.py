@@ -107,7 +107,7 @@ def submit_exam(request, exam_id):
 
         # Save answer to the database
         Answer.objects.create(
-            exam_result=exam_result,
+            result=exam_result,
             question=question,
             time_spent=time_spent,
             chosen_answer=chosen_answer,
@@ -135,7 +135,7 @@ def get_exam_results(request, exam_id):
     # Retrieve the exam object; ensure that the exam belongs to the authenticated user
     exam = get_object_or_404(Assessment, id=exam_id)
     exam_results = get_object_or_404(AssessmentResult, assessment=exam)
-    answers = Answer.objects.filter(exam_result=exam_results)
+    answers = Answer.objects.filter(result=exam_results)
 
     overall_correct_answers = 0
     overall_wrong_answers = 0
@@ -222,10 +222,10 @@ def take_quiz(request):
         return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
 
     data = request.data
-    categories = data.get('selected_categories')
+    selected_categories = data.get('selected_categories')
 
     # Get all questions from the category
-    all_questions = Question.objects.filter(category_id__in=categories)
+    all_questions = Question.objects.filter(category_id__in=selected_categories)
 
     if not all_questions:
         return Response({'error': 'No questions available to generate an exam.'}, status=status.HTTP_404_NOT_FOUND)
@@ -240,11 +240,17 @@ def take_quiz(request):
     quiz.questions.set(selected_questions)
 
     categories = set()  # Use a set to avoid duplicates
-    for c in categories:
-        category = Category.objects.get(name=c)
+    for c in selected_categories:
+
+        print('Finding category', id)
+        category = Category.objects.get(id=c)
+
+        print('Found category', category.name)
+
         categories.add(category)
 
     quiz.selected_categories.set(categories)
+
     quiz.save()
 
     # Format the questions and answers to send back to the frontend
@@ -262,6 +268,138 @@ def take_quiz(request):
     }
 
     return Response(quiz_data, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+def submit_quiz(request, quiz_id):
+    supabase_uid = get_user_id_from_token(request)
+
+    if not supabase_uid:
+        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    data = request.data
+
+    # Retrieve the exam object; ensure that the exam belongs to the authenticated user
+    quiz = get_object_or_404(Assessment, id=quiz_id)
+    if quiz.user.supabase_user_id != supabase_uid:
+        return Response({'error': 'You are not authorized to submit answers for this exam.'},
+                        status=status.HTTP_403_FORBIDDEN)
+
+    # Parse answers from request
+    answers = data.get('answers', [])
+
+    # Initialize tracking variables
+    score = 0
+
+    check_if_exists = AssessmentResult.objects.filter(assessment_id=quiz_id).exists()
+
+    if check_if_exists:
+        return Response({'error': 'Quiz was already taken.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Create an AssessmentResult object
+    quiz_result = AssessmentResult.objects.create(
+        assessment=quiz,
+        score=0,  # Placeholder; updated after processing
+        time_taken=0  # Placeholder; updated after processing
+    )
+
+    for answer_data in answers:
+        question_id = answer_data.get('question_id')
+        chosen_answer = answer_data.get('answer')
+        time_spent = answer_data.get('time_spent', 0)
+
+        # Get the corresponding question
+        question = get_object_or_404(Question, id=question_id)
+
+        # Check if the chosen answer is correct
+        correct_answer = question.choices[question.correct_answer]
+
+        is_correct = chosen_answer == correct_answer
+
+        if is_correct:
+            score += 1
+
+        # Save answer to the database
+        Answer.objects.create(
+            result=quiz_result,
+            question=question,
+            time_spent=time_spent,
+            chosen_answer=chosen_answer,
+            is_correct=is_correct
+        )
+
+    quiz_result.score = score
+    quiz_result.time_taken = data.get('total_time_taken_seconds', 0)
+    quiz_result.save()
+
+    user_id = User.objects.get(supabase_user_id=supabase_uid).id
+
+    estimate_student_ability_per_category(user_id)
+
+    return Response({'message': 'Quiz submitted successfully.'}, status=status.HTTP_201_CREATED)
+
+@api_view(['GET'])
+def get_quiz_results(request, quiz_id):
+    supabase_uid = get_user_id_from_token(request)
+
+    if not supabase_uid:
+        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    # Retrieve the exam object; ensure that the exam belongs to the authenticated user
+    quiz = get_object_or_404(Assessment, id=quiz_id)
+    quiz_result = get_object_or_404(AssessmentResult, assessment=quiz)
+    answers = Answer.objects.filter(result=quiz_result)
+
+    overall_correct_answers = 0
+    overall_wrong_answers = 0
+    category_stats = defaultdict(lambda: {'total_questions': 0, 'correct_answers': 0, 'wrong_answers': 0})
+
+    # Serialize answers
+    serialized_answers = []
+    for answer in answers:
+        category_name = answer.question.category.name
+        category_stats[category_name]['total_questions'] += 1
+
+        if answer.is_correct:
+            category_stats[category_name]['correct_answers'] += 1
+            overall_correct_answers += 1
+        else:
+            category_stats[category_name]['wrong_answers'] += 1
+            overall_wrong_answers += 1
+
+        serialized_answers.append({
+            'question_id': answer.question.id,
+            'question_text': answer.question.question_text,
+            'choices': list(answer.question.choices.values()),
+            'correct_answer': answer.question.choices[answer.question.correct_answer],
+            'chosen_answer': answer.chosen_answer,
+            'is_correct': answer.is_correct,
+            'time_spent': answer.time_spent,
+        })
+
+    categories = [
+        {
+            'category_name': category_name,
+            'total_questions': stats['total_questions'],
+            'correct_answers': stats['correct_answers'],
+            'wrong_answers': stats['wrong_answers'],
+        }
+        for category_name, stats in category_stats.items()
+    ]
+
+    result_data = {
+        'quiz_id': quiz.id,
+        'student_id': quiz.user.id,
+        'total_time_taken_seconds': quiz_result.time_taken,
+        'score': quiz_result.score,
+        'categories': categories,
+        'overall_correct_answers': overall_correct_answers,
+        'overall_wrong_answers': overall_wrong_answers,
+        'total_questions': len(answers),
+        'answers': serialized_answers,  # Include answers in response
+    }
+
+    return Response(result_data, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
@@ -301,21 +439,24 @@ def get_history(request):
 
     history = []
     for assessment in assessments:
+        result = AssessmentResult.objects.filter(assessment=assessment).first()
 
-        result = AssessmentResult.objects.get(assessment=assessment)
-
+        # Skip if no result exists
         if not result:
             continue
+
+        categories = list(assessment.selected_categories.values_list('name', flat=True))
+
+        print(categories)
 
         item = {
             'assessment_id': assessment.id,
             'type': assessment.type,
-            'score': result.score if result else None,
+            'score': result.score,
             'total_items': assessment.questions.count(),
-            'time_taken': result.time_taken if result else None,
-            'date_taken': assessment.created_at if result else None,
-            'categories': [category.name for category in
-                           assessment.selected_categories.all()]
+            'time_taken': result.time_taken,
+            'date_taken': assessment.created_at,
+            'categories': categories
         }
 
         history.append(item)

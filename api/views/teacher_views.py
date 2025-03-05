@@ -1,48 +1,45 @@
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from ..models import User, Class
-
+from ..models import User, Class, UserAbility, Assessment, AssessmentResult
+from django.shortcuts import get_object_or_404
 
 from api.views.general_views import get_user_id_from_token
 
+
 @api_view(['POST'])
 def create_class(request):
-    if request.method == 'POST':
+    supabase_uid = get_user_id_from_token(request)
 
-        user_id = get_user_id_from_token(request)
+    if not supabase_uid:
+        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
 
-        if not user_id:
-            return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
+    data = request.data
 
-        data = request.data
+    user = User.objects.get(supabase_user_id=supabase_uid)
 
-        user = User.objects.get(supabase_user_id=user_id)
+    if user.role != 'teacher':
+        return Response({"error": "Only teachers can create classes"}, status=403)
 
-        if user.role != 'teacher':
-            return Response({"error": "Only teachers can create classes"}, status=403)
+    class_name = data.get('name')
 
-        class_name = data.get('name')
+    if not class_name:
+        return Response({"error": "Class name is required"}, status=400)
 
-        if not class_name:
-            return Response({"error": "Class name is required"}, status=400)
+    # Create class and save students
+    new_class = Class.objects.create(name=class_name, teacher=user)
 
-        # Create class and save students
-        new_class = Class.objects.create(name=class_name, teacher=user)
-
-        return Response({"message": "Class created successfully", "class_id": new_class.id}, status=201)
-
-    return Response({"error": "Invalid request method"}, status=405)
+    return Response({"message": "Class created successfully", "class_id": new_class.id}, status=201)
 
 
 @api_view(['GET'])
 def get_classes(request):
-    user_id = get_user_id_from_token(request)
+    supabase_uid = get_user_id_from_token(request)
 
-    if not user_id:
+    if not supabase_uid:
         return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
 
-    user = User.objects.get(supabase_user_id=user_id)
+    user = User.objects.get(supabase_user_id=supabase_uid)
 
     if user.role != 'teacher':
         return Response({"error": "Only teachers can get classes"}, status=403)
@@ -64,74 +61,73 @@ def get_classes(request):
 
 @api_view(['GET'])
 def get_class(request, class_id):
-    if not class_id:
-        return Response({'error': 'Class id is required'}, status=400)
+    supabase_uid = get_user_id_from_token(request)
 
-    user_id = get_user_id_from_token(request)
-
-    if not user_id:
+    if not supabase_uid:
         return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
 
-    user = User.objects.get(supabase_user_id=user_id)
+    user = User.objects.get(supabase_user_id=supabase_uid)
 
     if user.role != 'teacher':
         return Response({"error": "Only teachers can get classes"}, status=403)
 
     teacher_class = Class.objects.get(id=class_id)
-    student_names = [student.full_name for student in teacher_class.students.all()]
+    students = [{'id': student.id, 'name': student.full_name} for student in teacher_class.students.all()]
 
     data_result = {
         'class_id': class_id,
         'class_name': teacher_class.name,
         'number_of_students': teacher_class.students.count(),
         'class_code': teacher_class.class_code,
-        'students': list(student_names)
+        'students': students
     }
 
     return Response({"class": data_result}, status=status.HTTP_200_OK)
 
 
-@api_view(['POST'])
-def join_class(request):
-    data = request.data
-
-    # Step 1: Get the student based on the authentication (assuming you get user info from token)
-    user_id = get_user_id_from_token(request)
-
-    if not user_id:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    user = User.objects.get(supabase_user_id=user_id)
-
-    if user.role != 'student':
-        return Response({"error": "Only students can join classes"}, status=403)
-
-    try:
-        teacher_class = Class.objects.get(class_code=data.get('class_code'))
-    except Class.DoesNotExist:
-        return Response({'error': 'Invalid class code.'}, status=status.HTTP_404_NOT_FOUND)
-
-    # Step 3: Add the student to the class
-    if user in teacher_class.students.all():
-        return Response({'message': 'You are already enrolled in this class.'}, status=status.HTTP_400_BAD_REQUEST)
-
-    teacher_class.students.add(user)  # Add student to the class's student list
-    teacher_class.save()
-
-    # Step 4: Return success response
-    return Response({'message': 'Successfully joined the class.'}, status=status.HTTP_200_OK)
-
-
-
-
-
-
-
-
 @api_view(['GET'])
-def generate_quiz(request):
-    user_id = get_user_id_from_token(request)
-    data = request.data
+def get_student_data(request, student_id):
+    supabase_uid = get_user_id_from_token(request)
 
-    if not user_id:
+    if not supabase_uid:
         return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    teacher = get_object_or_404(User, supabase_user_id=supabase_uid)
+
+    if teacher.role != 'teacher':
+        return Response({"error": "Only teachers can access student data"}, status=status.HTTP_403_FORBIDDEN)
+
+    student = get_object_or_404(User, id=student_id)
+
+    if student.role != 'student':
+        return Response({"error": "Student ID specified is not a student"}, status=status.HTTP_403_FORBIDDEN)
+
+    user_abilities = UserAbility.objects.filter(user_id=student_id)
+    stored_abilities = {user_ability.category.name: user_ability.ability_level for user_ability in user_abilities}
+
+    assessments = Assessment.objects.filter(user_id=student_id).prefetch_related('selected_categories')
+
+    history = []
+    for assessment in assessments:
+        result = AssessmentResult.objects.filter(assessment=assessment).first()  # Avoid exceptions
+
+        if not result:
+            continue
+
+        item = {
+            'assessment_id': assessment.id,
+            'type': assessment.type,
+            'score': result.score,
+            'total_items': assessment.questions.count(),
+            'time_taken': result.time_taken,
+            'date_taken': assessment.created_at,
+            'categories': [category.name for category in assessment.selected_categories.all()]
+        }
+
+        history.append(item)
+
+    return Response({
+        "name": student.full_name,
+        "abilities": stored_abilities,
+        "history": history
+    }, status=status.HTTP_200_OK)

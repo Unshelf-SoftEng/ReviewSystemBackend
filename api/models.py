@@ -91,7 +91,7 @@ class AssessmentResult(models.Model):
 
 
 class Answer(models.Model):
-    exam_result = models.ForeignKey(AssessmentResult, related_name='answers', on_delete=models.CASCADE)
+    result = models.ForeignKey(AssessmentResult, related_name='answers', on_delete=models.CASCADE)
     question = models.ForeignKey(Question, related_name='question', on_delete=models.CASCADE)
     time_spent = models.IntegerField(default=0)
     chosen_answer = models.CharField(max_length=255)

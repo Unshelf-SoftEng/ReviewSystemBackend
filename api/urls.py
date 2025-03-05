@@ -24,6 +24,10 @@ urlpatterns = [
 
     path('student/quiz/take', take_quiz, name='take_quiz'),
 
+    path('student/quiz/<quiz_id>/submit', submit_quiz, name='submit_quiz'),
+
+    path('student/quiz/<quiz_id>', get_quiz_results, name='get_quiz_results'),
+
 
     #Lessons
     path('lessons', get_lessons_overall, name='get_lessons_overall'),
@@ -37,6 +41,8 @@ urlpatterns = [
     path('teacher/class/<class_id>', get_class, name='get_class'),
 
     path('teacher/class/create', create_class, name='create_class'),
+
+    path('teacher/class/student/<student_id>', get_student_data, name='get_student_data'),
 
     path('student/class/join', join_class, name='join_class'),
 
