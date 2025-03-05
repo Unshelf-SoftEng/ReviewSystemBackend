@@ -11,9 +11,9 @@ from django.shortcuts import get_object_or_404
 
 @api_view(['GET'])
 def take_exam(request):
-    user_id = get_user_id_from_token(request)
+    supabase_uid = get_user_id_from_token(request)
 
-    if not user_id:
+    if not supabase_uid:
         return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
 
     # Get all questions from the database
@@ -22,15 +22,20 @@ def take_exam(request):
     if not all_questions:
         return Response({'error': 'No questions available to generate an exam.'}, status=status.HTTP_404_NOT_FOUND)
 
-    selected_questions = random.sample(list(all_questions), 60)
+    selected_questions = random.sample(list(all_questions), 5)
 
-    user = User.objects.get(supabase_user_id=user_id)
+    user = User.objects.get(supabase_user_id=supabase_uid)
 
     # Create a new exam instance for the authenticated user
     exam = Assessment.objects.create(user=user, type='Exam')
 
-    exam.questions.set(selected_questions)
+    categories = set()  # Use a set to avoid duplicates
+    for question in selected_questions:
+        category = Category.objects.get(id=question.category_id)
+        categories.add(category)
 
+    exam.selected_categories.set(categories)
+    exam.questions.set(selected_questions)
     exam.save()
 
     # Format the questions and answers to send back to the frontend
@@ -53,16 +58,16 @@ def take_exam(request):
 
 @api_view(['POST'])
 def submit_exam(request, exam_id):
-    user_id = get_user_id_from_token(request)
+    supabase_uid = get_user_id_from_token(request)
 
-    if not user_id:
+    if not supabase_uid:
         return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
 
     data = request.data
 
     # Retrieve the exam object; ensure that the exam belongs to the authenticated user
     exam = get_object_or_404(Assessment, id=exam_id)
-    if exam.user.supabase_user_id != user_id:
+    if exam.user.supabase_user_id != supabase_uid:
         return Response({'error': 'You are not authorized to submit answers for this exam.'},
                         status=status.HTTP_403_FORBIDDEN)
 
@@ -113,26 +118,22 @@ def submit_exam(request, exam_id):
     exam_result.time_taken = data.get('total_time_taken_seconds', 0)
     exam_result.save()
 
-    int_id = User.objects.get(supabase_user_id=user_id).id
+    user_id = User.objects.get(supabase_user_id=supabase_uid).id
 
-    estimate_student_ability_per_category(int_id)
+    estimate_student_ability_per_category(user_id)
 
     return Response({'message': 'Exam submitted successfully.'}, status=status.HTTP_201_CREATED)
 
 
 @api_view(['GET'])
 def get_exam_results(request, exam_id):
-    user_id = get_user_id_from_token(request)
+    supabase_uid = get_user_id_from_token(request)
 
-    if not user_id:
+    if not supabase_uid:
         return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
 
     # Retrieve the exam object; ensure that the exam belongs to the authenticated user
     exam = get_object_or_404(Assessment, id=exam_id)
-    if exam.user.supabase_user_id != user_id:
-        return Response({'error': 'You are not authorized to submit answers for this exam.'},
-                        status=status.HTTP_403_FORBIDDEN)
-
     exam_results = get_object_or_404(AssessmentResult, assessment=exam)
     answers = Answer.objects.filter(exam_result=exam_results)
 
@@ -175,7 +176,7 @@ def get_exam_results(request, exam_id):
 
     result_data = {
         'exam_id': exam.id,
-        'student_id': user_id,
+        'student_id': exam.user.id,
         'total_time_taken_seconds': exam_results.time_taken,
         'score': exam_results.score,
         'categories': categories,
@@ -190,21 +191,20 @@ def get_exam_results(request, exam_id):
 
 @api_view(['GET'])
 def get_ability(request):
-    user_id = get_user_id_from_token(request)
+    supabase_uid = get_user_id_from_token(request)
 
-    if not user_id:
+    if not supabase_uid:
         return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
 
     try:
-        int_id = User.objects.get(supabase_user_id=user_id).id
+        user_id = User.objects.get(supabase_user_id=supabase_uid).id
     except User.DoesNotExist:
         return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    int_id = User.objects.get(supabase_user_id=user_id).id
-    estimate_student_ability_per_category(int_id)
+    estimate_student_ability_per_category(user_id)
 
     # Retrieve stored abilities
-    user_abilities = UserAbility.objects.filter(user_id=int_id)
+    user_abilities = UserAbility.objects.filter(user_id=user_id)
     stored_abilities = {
         user_ability.category.name: user_ability.ability_level for user_ability in user_abilities
     }
@@ -216,12 +216,12 @@ def get_ability(request):
 
 @api_view(['GET'])
 def take_quiz(request):
-    user_id = get_user_id_from_token(request)
-    data = request.data
+    supabase_uid = get_user_id_from_token(request)
 
-    if not user_id:
+    if not supabase_uid:
         return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
 
+    data = request.data
     categories = data.get('selected_categories')
 
     # Get all questions from the category
@@ -232,14 +232,19 @@ def take_quiz(request):
 
     selected_questions = random.sample(list(all_questions), data.get('no_of_questions'))
 
-    user = User.objects.get(supabase_user_id=user_id)
+    user = User.objects.get(supabase_user_id=supabase_uid)
 
     # Create a new exam instance for the authenticated user
     quiz = Assessment.objects.create(user=user, type='Quiz')
 
     quiz.questions.set(selected_questions)
-    quiz.selected_categories.set(categories)
 
+    categories = set()  # Use a set to avoid duplicates
+    for c in categories:
+        category = Category.objects.get(name=c)
+        categories.add(category)
+
+    quiz.selected_categories.set(categories)
     quiz.save()
 
     # Format the questions and answers to send back to the frontend
@@ -261,9 +266,9 @@ def take_quiz(request):
 
 @api_view(['GET'])
 def get_lessons(request):
-    user_id = get_user_id_from_token(request)
+    supabase_uid = get_user_id_from_token(request)
 
-    if not user_id:
+    if not supabase_uid:
         return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
 
     # Fetch all category names
@@ -275,15 +280,49 @@ def get_lessons(request):
 # TODO
 @api_view(['GET'])
 def get_lesson(request, lesson_id):
-    user_id = get_user_id_from_token(request)
+    supabase_uid = get_user_id_from_token(request)
 
-    if not user_id:
+    if not supabase_uid:
         return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
 
     return Response({'lesson_id': lesson_id}, status=status.HTTP_200_OK)
 
 
-@api_view(['POST'])
+@api_view(['GET'])
+def get_history(request):
+    supabase_uid = get_user_id_from_token(request)
+
+    if not supabase_uid:
+        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    user_id = User.objects.get(supabase_user_id=supabase_uid).id
+
+    assessments = Assessment.objects.filter(user_id=user_id).prefetch_related('selected_categories')
+
+    history = []
+    for assessment in assessments:
+
+        result = AssessmentResult.objects.get(assessment=assessment)
+
+        if not result:
+            continue
+
+        item = {
+            'assessment_id': assessment.id,
+            'type': assessment.type,
+            'score': result.score if result else None,
+            'total_items': assessment.questions.count(),
+            'time_taken': result.time_taken if result else None,
+            'date_taken': assessment.created_at if result else None,
+            'categories': [category.name for category in
+                           assessment.selected_categories.all()]
+        }
+
+        history.append(item)
+
+    return Response(history, status=status.HTTP_200_OK)
+
+
 @api_view(['POST'])
 def join_class(request):
     user_id = get_user_id_from_token(request)

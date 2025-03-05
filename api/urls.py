@@ -20,8 +20,12 @@ urlpatterns = [
 
     path('student/ability', get_ability, name='get_student_abilities'),
 
+    path('student/history', get_history, name='get_student_history'),
+
     path('student/quiz/take', take_quiz, name='take_quiz'),
 
+
+    #Lessons
     path('lessons', get_lessons_overall, name='get_lessons_overall'),
 
     path('lessons/lesson_id', get_lesson, name='get_lesson'),
