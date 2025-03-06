@@ -22,7 +22,7 @@ def take_exam(request):
     if not all_questions:
         return Response({'error': 'No questions available to generate an exam.'}, status=status.HTTP_404_NOT_FOUND)
 
-    selected_questions = random.sample(list(all_questions), 60)
+    selected_questions = random.sample(list(all_questions), 5)
 
     user = User.objects.get(supabase_user_id=supabase_uid)
 
