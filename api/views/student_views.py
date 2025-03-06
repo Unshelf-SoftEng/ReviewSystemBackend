@@ -478,7 +478,7 @@ def join_class(request):
         return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
 
     data = request.data
-    code = data.get('code')
+    code = data.get('class_code')
 
     if not code:
         return Response({'error': 'Class code is required.'}, status=status.HTTP_400_BAD_REQUEST)
