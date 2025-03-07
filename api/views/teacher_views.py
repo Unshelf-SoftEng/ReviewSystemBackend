@@ -14,14 +14,13 @@ def create_class(request):
     if not supabase_uid:
         return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
 
-    data = request.data
-
     user = User.objects.get(supabase_user_id=supabase_uid)
 
     if user.role != 'teacher':
         return Response({"error": "Only teachers can create classes"}, status=403)
 
-    class_name = data.get('name')
+    data = request.data
+    class_name = data.get('class_name')
 
     if not class_name:
         return Response({"error": "Class name is required"}, status=400)
@@ -29,11 +28,12 @@ def create_class(request):
     # Create class and save students
     new_class = Class.objects.create(name=class_name, teacher=user)
 
-    return Response({"message": "Class created successfully", "class_id": new_class.id}, status=201)
+    return Response({"message": "Class created successfully", "class_id": new_class.id, "class_code": new_class.class_code}, status=201)
 
 
 @api_view(['GET'])
 def get_classes(request):
+
     supabase_uid = get_user_id_from_token(request)
 
     if not supabase_uid:
