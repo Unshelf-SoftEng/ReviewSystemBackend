@@ -4,7 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d83e15d4-b2c8-4a76-9aca-4b58469163cd" name="Changes" comment="feat: Added quiz urls">
+    <list default="true" id="d83e15d4-b2c8-4a76-9aca-4b58469163cd" name="Changes" comment="feat: Fix class codes">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/api/views/student_views.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/views/student_views.py" afterDir="false" />
     </list>
@@ -129,7 +129,8 @@
       <workItem from="1739831159454" duration="6908000" />
       <workItem from="1740018936894" duration="3295000" />
       <workItem from="1741064464992" duration="17048000" />
-      <workItem from="1741198856564" duration="7004000" />
+      <workItem from="1741198856564" duration="8545000" />
+      <workItem from="1741350064183" duration="100000" />
     </task>
     <task id="LOCAL-00001" summary="feat: Add login and registration using Supabase">
       <option name="closed" value="true" />
@@ -315,7 +316,23 @@
       <option name="project" value="LOCAL" />
       <updated>1741224862293</updated>
     </task>
-    <option name="localTasksCounter" value="24" />
+    <task id="LOCAL-00024" summary="feat: Fix class codes">
+      <option name="closed" value="true" />
+      <created>1741225194078</created>
+      <option name="number" value="00024" />
+      <option name="presentableId" value="LOCAL-00024" />
+      <option name="project" value="LOCAL" />
+      <updated>1741225194078</updated>
+    </task>
+    <task id="LOCAL-00025" summary="feat: Fix class codes">
+      <option name="closed" value="true" />
+      <created>1741225219386</created>
+      <option name="number" value="00025" />
+      <option name="presentableId" value="LOCAL-00025" />
+      <option name="project" value="LOCAL" />
+      <updated>1741225219386</updated>
+    </task>
+    <option name="localTasksCounter" value="26" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -358,6 +375,7 @@
     <MESSAGE value="fix: Updated processes" />
     <MESSAGE value="feat: Add Student History" />
     <MESSAGE value="feat: Added quiz urls" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: Added quiz urls" />
+    <MESSAGE value="feat: Fix class codes" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: Fix class codes" />
   </component>
 </project>

@@ -466,14 +466,14 @@ def get_history(request):
 
 @api_view(['POST'])
 def join_class(request):
-    user_id = get_user_id_from_token(request)
+    supabase_uid = get_user_id_from_token(request)
 
-    if not user_id:
+    if not supabase_uid:
         return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
 
     # Get the user instance
     try:
-        user = User.objects.get(supabase_user_id=user_id)
+        user = User.objects.get(supabase_user_id=supabase_uid)
     except User.DoesNotExist:
         return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -487,7 +487,7 @@ def join_class(request):
     except Class.DoesNotExist:
         return Response({'error': 'Invalid class code.'}, status=status.HTTP_404_NOT_FOUND)
 
-    if class_instance.students.filter(id=user_id).exists():
+    if class_instance.students.filter(id=user.id).exists():
         return Response({'message': 'You are already a member of this class.'}, status=status.HTTP_200_OK)
 
     # Add the user to the class
