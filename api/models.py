@@ -64,21 +64,43 @@ class Question(models.Model):
 
 
 class Assessment(models.Model):
-    EXAM = 'exam'
-    QUIZ = 'quiz'
-    ASSESSMENT_TYPES = [
-        (EXAM, 'EXAM'),
-        (QUIZ, 'QUIZ'),
-    ]
-
     user = models.ForeignKey('User', on_delete=models.CASCADE)
-    questions = models.ManyToManyField("Question", related_name="exams")
-    type = models.CharField(max_length=255, choices=ASSESSMENT_TYPES)
+    questions = models.ManyToManyField("Question", related_name="assessments")
     selected_categories = models.ManyToManyField(Category, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+
+    PREVIOUS_EXAM = 'previous_exam'
+    AI_GENERATED = 'ai_generated'
+    MIXED = 'mixed'
+
+    QUESTION_SOURCES = [
+        (PREVIOUS_EXAM, 'Previous Exam'),
+        (AI_GENERATED, 'AI Generated'),
+        (MIXED, 'Mixed'),
+    ]
+
+    TEACHER_GENERATED = 'teacher_generated'
+    SYSTEM_GENERATED = 'system_generated'
+    LESSON_GENERATED = 'lesson_generated'
+
+    QUIZ_CATEGORIES = [
+        (TEACHER_GENERATED, 'Teacher Generated'),
+        (SYSTEM_GENERATED, 'System Generated'),
+        (LESSON_GENERATED, 'Lesson Generated'),
+    ]
+
+     = models.CharField(
+        max_length=50,
+        choices=QUIZ_CATEGORIES,
+        blank=True,
+        null=True,
+        help_text="Only applicable for quizzes"
+    )
+
     def __str__(self):
-        return f"Exam for {self.user.email}"
+        return f"{self.__class__.__name__} for {self.user.email}"
+
 
 
 class AssessmentResult(models.Model):
