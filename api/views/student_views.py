@@ -10,6 +10,45 @@ from django.shortcuts import get_object_or_404
 
 
 @api_view(['GET'])
+def get_initial_exam(request):
+    supabase_uid = get_user_id_from_token(request)
+
+    if not supabase_uid:
+        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    try:
+        user = User.objects.get(supabase_user_id=supabase_uid)
+    except User.DoesNotExist:
+        return Response({'error': 'User does not not exist.'}, status=status.HTTP_404_NOT_FOUND)
+
+    if user.role != 'student':
+        return Response({"error": "You are not authorized to access this link."}, status=403)
+
+        # Retrieve the exam object; ensure that the exam belongs to the authenticated user
+    exam = get_object_or_404(Assessment, id=1)
+    if exam.user.supabase_user_id != supabase_uid:
+        return Response({'error': 'You are not authorized to submit answers for this exam.'},
+                        status=status.HTTP_403_FORBIDDEN)
+
+    selected_questions = exam.questions.all()
+
+    exam_data = {
+        'exam_id': exam.id,
+        'questions': [
+            {
+                'question_id': question.id,
+                'image_url': question.image_url,
+                'question_text': question.question_text,
+                'choices': list(question.choices.values()),
+            }
+            for question in selected_questions
+        ],
+        'question_ids': [question.id for question in selected_questions],
+    }
+
+    return Response(exam_data, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
 def take_exam(request):
     supabase_uid = get_user_id_from_token(request)
 
@@ -84,16 +123,19 @@ def submit_exam(request, exam_id):
                         status=status.HTTP_403_FORBIDDEN)
 
     data = request.data
+    is_initial = data.get('is_initial', False)
     # Parse answers from request
     answers = data.get('answers', [])
 
     # Initialize tracking variables
     score = 0
+    if not is_initial:
+        assessment = Assessment.objects.get(id=exam.id)
 
-    check_if_exists = AssessmentResult.objects.filter(assessment_id=exam_id).exists()
+        check_if_exists = AssessmentResult.objects.filter(assessment=assessment, user=user).exists()
 
-    if check_if_exists:
-        return Response({'error': 'Exam was already taken.'}, status=status.HTTP_400_BAD_REQUEST)
+        if check_if_exists:
+            return Response({'error': 'Exam was already taken.'}, status=status.HTTP_400_BAD_REQUEST)
 
     # Create an AssessmentResult object
     exam_result = AssessmentResult.objects.create(
@@ -135,6 +177,7 @@ def submit_exam(request, exam_id):
 
     return Response({'message': 'Exam submitted successfully.'}, status=status.HTTP_201_CREATED)
 
+
 @api_view(['GET'])
 def get_exam_results(request, exam_id):
     supabase_uid = get_user_id_from_token(request)
@@ -152,7 +195,7 @@ def get_exam_results(request, exam_id):
 
     # Retrieve the exam object; ensure that the exam belongs to the authenticated user
     exam = get_object_or_404(Assessment, id=exam_id)
-    exam_results = get_object_or_404(AssessmentResult, assessment=exam)
+    exam_results = get_object_or_404(AssessmentResult, assessment=exam, user=user)
     answers = Answer.objects.filter(result=exam_results)
 
     overall_correct_answers = 0
@@ -252,19 +295,36 @@ def take_quiz(request):
 
     data = request.data
     selected_categories = data.get('selected_categories')
+    no_of_questions = data.get('no_of_questions')
+    question_source = data.get('question_source')
+    source = data.get('source')
 
-    # Get all questions from the category
-    all_questions = Question.objects.filter(category_id__in=selected_categories)
 
-    if not all_questions:
-        return Response({'error': 'No questions available to generate an exam.'}, status=status.HTTP_404_NOT_FOUND)
 
-    selected_questions = random.sample(list(all_questions), data.get('no_of_questions'))
+    if question_source == 'previous_exam':
+        # Get all questions from the category
+        all_questions = Question.objects.filter(category_id__in=selected_categories)
 
-    # Create a new exam instance for the authenticated user
-    quiz = Assessment.objects.create(user=user, type='Quiz')
+        if not all_questions:
+            return Response({'error': 'No questions available to generate an exam.'}, status=status.HTTP_404_NOT_FOUND)
 
-    quiz.questions.set(selected_questions)
+        selected_questions = random.sample(list(all_questions), no_of_questions)
+
+    elif question_source == 'ai_generated':
+
+        return Response({'message': 'AI-generated questions feature has not been implemented yet.'},
+                        status=status.HTTP_501_NOT_IMPLEMENTED)
+    else:
+        pe_questions = random.choice(no_of_questions)
+
+        all_questions = Question.objects.filter(category_id__in=selected_categories)
+
+        if not all_questions:
+            return Response({'error': 'No questions available to generate an exam'}, status=status.HTTP_404_NOT_FOUND)
+
+        selected_questions = random.sample(list(all_questions), pe_questions)
+
+        # Generate Questions from AI
 
     categories = set()  # Use a set to avoid duplicates
     for c in selected_categories:
@@ -275,8 +335,8 @@ def take_quiz(request):
 
         categories.add(category)
 
-    quiz.selected_categories.set(categories)
-
+    # Create a new exam instance for the authenticated user
+    quiz = Assessment.objects.create(user=user, type='Quiz', source=source, questions=selected_questions, selected_categories=categories)
     quiz.save()
 
     # Format the questions and answers to send back to the frontend
@@ -442,6 +502,7 @@ def get_quiz_results(request, quiz_id):
 
     return Response(result_data, status=status.HTTP_200_OK)
 
+
 @api_view(['GET'])
 def get_history(request):
     supabase_uid = get_user_id_from_token(request)
@@ -485,6 +546,7 @@ def get_history(request):
 
     return Response(history, status=status.HTTP_200_OK)
 
+
 @api_view(['GET'])
 def get_class(request):
     supabase_uid = get_user_id_from_token(request)
@@ -519,7 +581,8 @@ def join_class(request):
         return Response({"error": "You are not authorized to access this link"}, status=status.HTTP_403_FORBIDDEN)
 
     if user.enrolled_classes.exists():
-        return Response({'error': 'You are already enrolled in a class. You cannot join another.'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'error': 'You are already enrolled in a class. You cannot join another.'},
+                        status=status.HTTP_400_BAD_REQUEST)
 
     data = request.data
     code = data.get('class_code')
@@ -536,6 +599,7 @@ def join_class(request):
     class_instance.students.add(user)
 
     return Response({'message': 'Successfully joined the class.'}, status=status.HTTP_200_OK)
+
 
 @api_view(['GET'])
 def check_enrolled(request):
@@ -563,14 +627,11 @@ def check_enrolled(request):
         {
             "id": class_obj.id,
             "name": class_obj.name,
-            "teacher": class_obj.teacher.first_name + " " + class_obj.teacher.last_name,  # Assuming User model has a full_name field
+            "teacher": class_obj.teacher.first_name + " " + class_obj.teacher.last_name,
+            # Assuming User model has a full_name field
             "class_code": class_obj.class_code,
         }
         for class_obj in enrolled_classes
     ]
 
     return Response({"enrolled_classes": class_data}, status=status.HTTP_200_OK)
-
-
-
-
