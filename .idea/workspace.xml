@@ -4,7 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d83e15d4-b2c8-4a76-9aca-4b58469163cd" name="Changes" comment="fix(route): Issue with routing wherein the path of teacher/class/&lt;class_id&gt; gets called when accessing teacher/class/teacher">
+    <list default="true" id="d83e15d4-b2c8-4a76-9aca-4b58469163cd" name="Changes" comment="feat: Restrict access to student links and add enrollment check  &#10;&#10;- Disallowed access to student links for unauthorized users  &#10;- Implemented `check_enrolled` to verify if a student is already in a class">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/api/models.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/models.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/api/views/student_views.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/views/student_views.py" afterDir="false" />
@@ -132,7 +132,7 @@
       <workItem from="1741064464992" duration="17048000" />
       <workItem from="1741198856564" duration="8545000" />
       <workItem from="1741350064183" duration="1401000" />
-      <workItem from="1741671744914" duration="3831000" />
+      <workItem from="1741671744914" duration="8406000" />
     </task>
     <task id="LOCAL-00001" summary="feat: Add login and registration using Supabase">
       <option name="closed" value="true" />
@@ -350,7 +350,15 @@
       <option name="project" value="LOCAL" />
       <updated>1741351462561</updated>
     </task>
-    <option name="localTasksCounter" value="28" />
+    <task id="LOCAL-00028" summary="feat: Restrict access to student links and add enrollment check  &#10;&#10;- Disallowed access to student links for unauthorized users  &#10;- Implemented `check_enrolled` to verify if a student is already in a class">
+      <option name="closed" value="true" />
+      <created>1741707172298</created>
+      <option name="number" value="00028" />
+      <option name="presentableId" value="LOCAL-00028" />
+      <option name="project" value="LOCAL" />
+      <updated>1741707172298</updated>
+    </task>
+    <option name="localTasksCounter" value="29" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -395,6 +403,7 @@
     <MESSAGE value="feat: Added quiz urls" />
     <MESSAGE value="feat: Fix class codes" />
     <MESSAGE value="fix(route): Issue with routing wherein the path of teacher/class/&lt;class_id&gt; gets called when accessing teacher/class/teacher" />
-    <option name="LAST_COMMIT_MESSAGE" value="fix(route): Issue with routing wherein the path of teacher/class/&lt;class_id&gt; gets called when accessing teacher/class/teacher" />
+    <MESSAGE value="feat: Restrict access to student links and add enrollment check  &#10;&#10;- Disallowed access to student links for unauthorized users  &#10;- Implemented `check_enrolled` to verify if a student is already in a class" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: Restrict access to student links and add enrollment check  &#10;&#10;- Disallowed access to student links for unauthorized users  &#10;- Implemented `check_enrolled` to verify if a student is already in a class" />
   </component>
 </project>
