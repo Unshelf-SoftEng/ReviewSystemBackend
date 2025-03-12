@@ -105,14 +105,20 @@ def upload_questions_from_sheet(spreadsheet_id, range_name):
 
 def upload_lessons_from_sheet(spreadsheet_id, range_name):
     sheet_data = get_sheet_data(spreadsheet_id, range_name)
-
     if sheet_data:
         for row in sheet_data[1:]:
-            lesson, created = Lesson.objects.get_or_create(lesson_name=row[0])
-            chapter, _ = Chapter.objects.get_or_create(
+
+            if Lesson.objects.filter(lesson_name=row[0]).exists():
+                lesson = Lesson.objects.get(lesson_name=row[0])
+            else:
+                lesson = Lesson.objects.create(lesson_name=row[0])
+
+            chapter, created = Chapter.objects.update_or_create(
                 lesson=lesson,
                 chapter_name=row[2],
                 chapter_number=row[1],
                 content=row[3]
             )
-            print(f"Uploaded: {lesson.lesson_name} - {chapter.chapter_name}")
+
+            action = "Updated" if not created else "Uploaded"
+            print(f"{action}: {lesson.lesson_name} - {chapter.chapter_name}")
