@@ -12,6 +12,9 @@ urlpatterns = [
     path('refresh-token/', refresh_token, name='refresh_token'),
 
     # Student Views
+
+    path('student/class', get_class, name='get_class'),
+
     path('student/class/join', join_class, name='join_class'),
 
     path('student/exam/1/take', get_initial_exam, name='get_initial_exam'),

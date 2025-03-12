@@ -55,7 +55,7 @@ def get_class(request):
             "name": class_obj.name,
             "teacher": class_obj.teacher.first_name + " " + class_obj.teacher.last_name,
             "class_code": class_obj.class_code,
-            "lesson_titles": lesson_data
+            "lessons": lesson_data
         }
         for class_obj in enrolled_classes
     ]
@@ -91,7 +91,7 @@ def join_class(request):
     try:
         class_instance = Class.objects.get(class_code=code)  # Fetch class with the given code
     except Class.DoesNotExist:
-        return Response({'error': 'Invalid class code.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'error': 'Class does not exist.'}, status=status.HTTP_404_NOT_FOUND)
 
     # Add the user to the class
     class_instance.students.add(user)

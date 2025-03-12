@@ -1,7 +1,7 @@
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from api.models import Question, Category
+from api.models import Question, Category, Lesson, Chapter
 import json
 
 CATEGORY_MAPPING = {
@@ -101,3 +101,18 @@ def upload_questions_from_sheet(spreadsheet_id, range_name):
                     choices=choices,
                     correct_answer=correct_answer
                 )
+
+
+def upload_lessons_from_sheet(spreadsheet_id, range_name):
+    sheet_data = get_sheet_data(spreadsheet_id, range_name)
+
+    if sheet_data:
+        for row in sheet_data[1:]:
+            lesson, created = Lesson.objects.get_or_create(lesson_name=row[0])
+            chapter, _ = Chapter.objects.get_or_create(
+                lesson=lesson,
+                chapter_name=row[2],
+                chapter_number=row[1],
+                content=row[3]
+            )
+            print(f"Uploaded: {lesson.lesson_name} - {chapter.chapter_name}")

@@ -178,6 +178,7 @@ class Chapter(models.Model):
     lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name='chapters')
     chapter_name = models.CharField(max_length=255)
     chapter_number = models.PositiveIntegerField()
+    content = models.TextField()
 
     def __str__(self):
         return f"{self.lesson.lesson_name} - {self.chapter_number}. {self.chapter_name}"
