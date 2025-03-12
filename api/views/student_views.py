@@ -2,11 +2,101 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 import random
-from ..models import User, Question, Assessment, Answer, AssessmentResult, UserAbility, Category, Class
+from ..models import User, Question, Assessment, Answer, AssessmentResult, UserAbility, Category, Class, Lesson, \
+    LessonProgress
 from collections import defaultdict
 from ..ai.estimate_student_ability import estimate_student_ability_per_category
 from api.views.general_views import get_user_id_from_token
 from django.shortcuts import get_object_or_404
+
+
+@api_view(['GET'])
+def get_class(request):
+    supabase_uid = get_user_id_from_token(request)
+
+    if not supabase_uid:
+        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    try:
+        user = User.objects.get(supabase_user_id=supabase_uid)
+    except User.DoesNotExist:
+        return Response({'error': 'User does not exist.'}, status=status.HTTP_404_NOT_FOUND)
+
+    if user.role != 'student':
+        return Response({"error": "You are not authorized to access this link"}, status=status.HTTP_403_FORBIDDEN)
+
+    # Get the classes the student is enrolled in
+    enrolled_classes = user.enrolled_classes.all()
+
+    if not enrolled_classes.exists():
+        return Response({"message": "You are not enrolled in any class."}, status=status.HTTP_200_OK)
+
+    lessons = Lesson.objects.all()
+    lesson_data = []
+    for lesson in lessons:
+
+        progress = LessonProgress.objects.filter(user=user, lesson=lesson).first()
+
+        if not progress:
+            progress = LessonProgress(user=user, lesson=lesson)
+
+        progress_percentage = progress.progress_percentage if progress else 0.0  # Default to 0% if no progress
+
+        lesson_data.append({
+            "id": lesson.id,
+            "lesson_name": lesson.lesson_name,
+            "progress_percentage": progress_percentage
+        })
+
+    # Serialize class data
+    class_data = [
+        {
+            "id": class_obj.id,
+            "name": class_obj.name,
+            "teacher": class_obj.teacher.first_name + " " + class_obj.teacher.last_name,
+            "class_code": class_obj.class_code,
+            "lesson_titles": lesson_data
+        }
+        for class_obj in enrolled_classes
+    ]
+
+    return Response({"enrolled_classes": class_data}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+def join_class(request):
+    supabase_uid = get_user_id_from_token(request)
+
+    if not supabase_uid:
+        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    try:
+        user = User.objects.get(supabase_user_id=supabase_uid)
+    except User.DoesNotExist:
+        return Response({'error': 'User does not exist.'}, status=status.HTTP_404_NOT_FOUND)
+
+    if user.role != 'student':
+        return Response({"error": "You are not authorized to access this link"}, status=status.HTTP_403_FORBIDDEN)
+
+    if user.enrolled_classes.exists():
+        return Response({'error': 'You are already enrolled in a class. You cannot join another.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    data = request.data
+    code = data.get('class_code')
+
+    if not code:
+        return Response({'error': 'Class code is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        class_instance = Class.objects.get(class_code=code)  # Fetch class with the given code
+    except Class.DoesNotExist:
+        return Response({'error': 'Invalid class code.'}, status=status.HTTP_404_NOT_FOUND)
+
+    # Add the user to the class
+    class_instance.students.add(user)
+
+    return Response({'message': 'Successfully joined the class.'}, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
@@ -47,6 +137,7 @@ def get_initial_exam(request):
     }
 
     return Response(exam_data, status=status.HTTP_200_OK)
+
 
 @api_view(['GET'])
 def take_exam(request):
@@ -299,8 +390,6 @@ def take_quiz(request):
     question_source = data.get('question_source')
     source = data.get('source')
 
-
-
     if question_source == 'previous_exam':
         # Get all questions from the category
         all_questions = Question.objects.filter(category_id__in=selected_categories)
@@ -336,7 +425,8 @@ def take_quiz(request):
         categories.add(category)
 
     # Create a new exam instance for the authenticated user
-    quiz = Assessment.objects.create(user=user, type='Quiz', source=source, questions=selected_questions, selected_categories=categories)
+    quiz = Assessment.objects.create(user=user, type='Quiz', source=source, questions=selected_questions,
+                                     selected_categories=categories)
     quiz.save()
 
     # Format the questions and answers to send back to the frontend
@@ -545,93 +635,3 @@ def get_history(request):
         history.append(item)
 
     return Response(history, status=status.HTTP_200_OK)
-
-
-@api_view(['GET'])
-def get_class(request):
-    supabase_uid = get_user_id_from_token(request)
-
-    if not supabase_uid:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    try:
-        user = User.objects.get(supabase_user_id=supabase_uid)
-    except User.DoesNotExist:
-        return Response({'error': 'User does not exist.'}, status=status.HTTP_404_NOT_FOUND)
-
-    if user.role != 'student':
-        return Response({"error": "You are not authorized to access this link"}, status=403)
-
-    class_instance = Class.objects.filter(user)
-
-
-@api_view(['POST'])
-def join_class(request):
-    supabase_uid = get_user_id_from_token(request)
-
-    if not supabase_uid:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    try:
-        user = User.objects.get(supabase_user_id=supabase_uid)
-    except User.DoesNotExist:
-        return Response({'error': 'User does not exist.'}, status=status.HTTP_404_NOT_FOUND)
-
-    if user.role != 'student':
-        return Response({"error": "You are not authorized to access this link"}, status=status.HTTP_403_FORBIDDEN)
-
-    if user.enrolled_classes.exists():
-        return Response({'error': 'You are already enrolled in a class. You cannot join another.'},
-                        status=status.HTTP_400_BAD_REQUEST)
-
-    data = request.data
-    code = data.get('class_code')
-
-    if not code:
-        return Response({'error': 'Class code is required.'}, status=status.HTTP_400_BAD_REQUEST)
-
-    try:
-        class_instance = Class.objects.get(class_code=code)  # Fetch class with the given code
-    except Class.DoesNotExist:
-        return Response({'error': 'Invalid class code.'}, status=status.HTTP_404_NOT_FOUND)
-
-    # Add the user to the class
-    class_instance.students.add(user)
-
-    return Response({'message': 'Successfully joined the class.'}, status=status.HTTP_200_OK)
-
-
-@api_view(['GET'])
-def check_enrolled(request):
-    supabase_uid = get_user_id_from_token(request)
-
-    if not supabase_uid:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    try:
-        user = User.objects.get(supabase_user_id=supabase_uid)
-    except User.DoesNotExist:
-        return Response({'error': 'User does not exist.'}, status=status.HTTP_404_NOT_FOUND)
-
-    if user.role != 'student':
-        return Response({"error": "You are not authorized to access this link"}, status=status.HTTP_403_FORBIDDEN)
-
-    # Get the classes the student is enrolled in
-    enrolled_classes = user.enrolled_classes.all()
-
-    if not enrolled_classes.exists():
-        return Response({"message": "You are not enrolled in any class."}, status=status.HTTP_200_OK)
-
-    # Serialize class data
-    class_data = [
-        {
-            "id": class_obj.id,
-            "name": class_obj.name,
-            "teacher": class_obj.teacher.first_name + " " + class_obj.teacher.last_name,
-            # Assuming User model has a full_name field
-            "class_code": class_obj.class_code,
-        }
-        for class_obj in enrolled_classes
-    ]
-
-    return Response({"enrolled_classes": class_data}, status=status.HTTP_200_OK)

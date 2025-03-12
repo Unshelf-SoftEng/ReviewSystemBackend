@@ -131,3 +131,35 @@ def get_student_data(request, student_id):
         "abilities": stored_abilities,
         "history": history
     }, status=status.HTTP_200_OK)
+
+#TODO
+@api_view(['GET'])
+def get_create_assessment_data(request):
+    supabase_uid = get_user_id_from_token(request)
+
+    if not supabase_uid:
+        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    teacher = get_object_or_404(User, supabase_user_id=supabase_uid)
+
+    if teacher.role != 'teacher':
+        return Response({"error": "Only teachers can access student data"}, status=status.HTTP_403_FORBIDDEN)
+
+    return Response("", status=status.HTTP_200_OK)
+
+#TODO
+@api_view(['POST'])
+def create_assessment(request):
+    supabase_uid = get_user_id_from_token(request)
+
+    if not supabase_uid:
+        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    teacher = get_object_or_404(User, supabase_user_id=supabase_uid)
+
+    if teacher.role != 'teacher':
+        return Response({"error": "Only teachers can access student data"}, status=status.HTTP_403_FORBIDDEN)
+
+    data = request.data
+
+    return Response("", status=status.HTTP_200_OK)

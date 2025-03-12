@@ -9,9 +9,11 @@ class User(models.Model):
     # User roles
     TEACHER = 'teacher'
     STUDENT = 'student'
+    ADMIN = 'admin'
     USER_ROLES = [
         (TEACHER, 'Teacher'),
         (STUDENT, 'Student'),
+        (ADMIN, 'Admin'),
     ]
 
     supabase_user_id = models.CharField(max_length=255, unique=True)
@@ -64,11 +66,6 @@ class Question(models.Model):
 
 
 class Assessment(models.Model):
-    user = models.ForeignKey('User', on_delete=models.CASCADE)
-    questions = models.ManyToManyField("Question", related_name="assessments")
-    selected_categories = models.ManyToManyField(Category, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
     QUIZ = 'quiz'
     EXAM = 'exam'
 
@@ -76,8 +73,6 @@ class Assessment(models.Model):
         (QUIZ, 'Quiz'),
         (EXAM, 'Exam'),
     ]
-
-    type = models.CharField(max_length=50, choices=TYPE_CHOICES)
 
     PREVIOUS_EXAM = 'previous_exam'
     AI_GENERATED = 'ai_generated'
@@ -92,20 +87,40 @@ class Assessment(models.Model):
     TEACHER_GENERATED = 'teacher_generated'
     LESSON_GENERATED = 'lesson_generated'
     STUDENT_INITIATED = 'student_initiated'
+    ADMIN_GENERATED = 'admin_generated'
 
     SOURCE_CHOICES = [
         (TEACHER_GENERATED, 'Teacher Generated'),
         (LESSON_GENERATED, 'Lesson Generated'),
         (STUDENT_INITIATED, 'Student Initiated'),
+        (ADMIN_GENERATED, 'Admin Generated'),
     ]
 
+    CREATED = 'created'
+    IN_PROGRESS = 'in_progress'
+    COMPLETED = 'completed'
+
+    STATUS_CHOICES = [
+        (CREATED, 'Created'),
+        (IN_PROGRESS, 'In Progress'),
+        (COMPLETED, 'Completed'),
+    ]
+
+    user = models.ForeignKey('User', on_delete=models.CASCADE)
+    questions = models.ManyToManyField("Question", related_name="assessments")
+    selected_categories = models.ManyToManyField(Category, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    taken_at = models.DateTimeField(auto_now=True)
+    time_in_seconds = models.IntegerField(default=0)
+    deadline = models.DateTimeField(null=True)
+    type = models.CharField(max_length=50, choices=TYPE_CHOICES)
+    status = models.CharField(max_length=50, choices=STATUS_CHOICES)
     question_source = models.CharField(
         max_length=50,
         choices=QUESTION_SOURCE_CHOICES,
         default=PREVIOUS_EXAM,
         help_text="Indicates if questions are from previous exams, AI-generated, or a mix."
     )
-
     source = models.CharField(
         max_length=50,
         choices=SOURCE_CHOICES,
@@ -154,3 +169,26 @@ class Class(models.Model):
 
 class Lesson(models.Model):
     lesson_name = models.CharField(max_length=255)
+
+    def __str__(self):
+        return self.lesson_name
+
+
+class Chapter(models.Model):
+    lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name='chapters')
+    chapter_name = models.CharField(max_length=255)
+    chapter_number = models.PositiveIntegerField()
+
+    def __str__(self):
+        return f"{self.lesson.lesson_name} - {self.chapter_number}. {self.chapter_name}"
+
+
+class LessonProgress(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='lesson_progress')
+    lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name='progress')
+    current_chapter = models.ForeignKey(Chapter, on_delete=models.SET_NULL, null=True, blank=True,
+                                        related_name='progress', default=1)
+    progress_percentage = models.FloatField(default=0.0)
+
+    def __str__(self):
+        return f"{self.user.full_name} - {self.lesson.lesson_name} Progress: {self.progress_percentage}%"
