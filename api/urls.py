@@ -31,15 +31,19 @@ urlpatterns = [
 
     path('student/quiz/take', take_quiz, name='take_quiz'),
 
-    path('student/quiz/<quiz_id>/submit', submit_quiz, name='submit_quiz'),
+    path('student/quiz/<quiz_id>/submit', submit_exam, name='submit_quiz'),
 
-    path('student/quiz/<quiz_id>', get_quiz_results, name='get_quiz_results'),
+    path('student/quiz/<quiz_id>', get_exam_results, name='get_quiz_results'),
 
 
     #Lessons
     path('lessons', get_lessons_overall, name='get_lessons_overall'),
 
-    path('lessons/lesson_id', get_lesson, name='get_lesson'),
+    path('lessons/<lesson_id>/update_progress', update_lesson_progress, name='update_lesson_progress'),
+
+    path('lessons/<lesson_id>', get_lesson, name='get_lesson'),
+
+
 
     # Teacher Views
 
@@ -47,7 +51,15 @@ urlpatterns = [
 
     path('teacher/class/create', create_class, name='create_class'),
 
-    path('teacher/class/<class_id>', get_class, name='get_class'),
 
     path('teacher/class/student/<student_id>', get_student_data, name='get_student_data'),
+
+    path('teacher/get_questions', get_all_questions, name='get_all_questions'),
+
+    path('teacher/class/<class_id>/create-quiz', create_quiz, name='create_quiz'),
+
+    path('teacher/class/<class_id>/quiz', get_all_quizzes, name='get_all_quizzes'),
+
+    path('teacher/class/<class_id>', get_class, name='get_class'),
+
 ]

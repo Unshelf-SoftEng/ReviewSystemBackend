@@ -29,11 +29,13 @@ class Command(BaseCommand):
             id=1,
             user=user,
             type='exam',
+            name='Initial Assessment',
             defaults={
                 'status': 'created',
                 'question_source': 'previous_exam',
                 'source': 'admin_generated',
                 'time_in_seconds': 8100,
+
             }
         )
 

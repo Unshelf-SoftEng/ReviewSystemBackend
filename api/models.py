@@ -21,6 +21,7 @@ class User(models.Model):
     first_name = models.CharField(max_length=255, null=True)
     last_name = models.CharField(max_length=255, null=True)
     role = models.CharField(max_length=255, choices=USER_ROLES, default=STUDENT)
+    enrolled_class = models.ForeignKey('Class', on_delete=models.SET_NULL, null=True, blank=True)
 
     @property
     def full_name(self):
@@ -106,7 +107,9 @@ class Assessment(models.Model):
         (COMPLETED, 'Completed'),
     ]
 
+    name = models.CharField(max_length=50, unique=True, null=True)
     user = models.ForeignKey('User', on_delete=models.CASCADE)
+    class_owner = models.ForeignKey('Class', on_delete=models.CASCADE, null=True)
     questions = models.ManyToManyField("Question", related_name="assessments")
     selected_categories = models.ManyToManyField(Category, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -115,6 +118,7 @@ class Assessment(models.Model):
     deadline = models.DateTimeField(null=True)
     type = models.CharField(max_length=50, choices=TYPE_CHOICES)
     status = models.CharField(max_length=50, choices=STATUS_CHOICES)
+
     question_source = models.CharField(
         max_length=50,
         choices=QUESTION_SOURCE_CHOICES,
@@ -136,13 +140,14 @@ class AssessmentResult(models.Model):
     assessment = models.ForeignKey(Assessment, on_delete=models.CASCADE)
     score = models.IntegerField(default=0)
     time_taken = models.IntegerField(default=0)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
 
     def __str__(self):
         return f'{self.assessment.user.full_name} - {self.assessment} - {self.score}'
 
 
 class Answer(models.Model):
-    result = models.ForeignKey(AssessmentResult, related_name='answers', on_delete=models.CASCADE)
+    exam_result = models.ForeignKey(AssessmentResult, related_name='answers', on_delete=models.CASCADE)
     question = models.ForeignKey(Question, related_name='question', on_delete=models.CASCADE)
     time_spent = models.IntegerField(default=0)
     chosen_answer = models.CharField(max_length=255)
@@ -155,7 +160,6 @@ class Answer(models.Model):
 class Class(models.Model):
     name = models.CharField(max_length=255)
     teacher = models.ForeignKey('User', on_delete=models.CASCADE, limit_choices_to={'role': 'teacher'})
-    students = models.ManyToManyField('User', related_name='enrolled_classes', limit_choices_to={'role': 'student'})
     class_code = models.CharField(max_length=8, unique=True, blank=True, editable=False)
 
     def save(self, *args, **kwargs):

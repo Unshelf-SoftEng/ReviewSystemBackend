@@ -1,9 +1,9 @@
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from ..models import User, Class, UserAbility, Assessment, AssessmentResult
+from ..models import User, Class, UserAbility, Assessment, AssessmentResult, Question
 from django.shortcuts import get_object_or_404
-
+from django.utils.dateparse import parse_datetime
 from api.views.general_views import get_user_id_from_token
 
 
@@ -47,8 +47,9 @@ def get_classes(request):
     classes = Class.objects.filter(teacher=user)
 
     data_result = []
+
     for class_obj in classes:
-        num_students = class_obj.students.count()  # Assuming you have a related field `students` in the Class model
+        num_students = User.objects.filter(enrolled_class=class_obj).count()
         data_result.append({
             'class_id': class_obj.id,
             'class_name': class_obj.name,
@@ -132,9 +133,9 @@ def get_student_data(request, student_id):
         "history": history
     }, status=status.HTTP_200_OK)
 
-#TODO
+
 @api_view(['GET'])
-def get_create_assessment_data(request):
+def get_all_questions(request):
     supabase_uid = get_user_id_from_token(request)
 
     if not supabase_uid:
@@ -145,11 +146,21 @@ def get_create_assessment_data(request):
     if teacher.role != 'teacher':
         return Response({"error": "Only teachers can access student data"}, status=status.HTTP_403_FORBIDDEN)
 
-    return Response("", status=status.HTTP_200_OK)
+    questions = Question.objects.all()
 
-#TODO
+    response_data = []
+    for question in questions:
+        question_data = {
+            'question_id': question.id,
+            'question_text': question.question_text,
+            'category_name': question.category.name,
+        }
+        response_data.append(question_data)
+
+    return Response(response_data, status=status.HTTP_200_OK)
+
 @api_view(['POST'])
-def create_assessment(request):
+def create_quiz(request, class_id):
     supabase_uid = get_user_id_from_token(request)
 
     if not supabase_uid:
@@ -161,5 +172,69 @@ def create_assessment(request):
         return Response({"error": "Only teachers can access student data"}, status=status.HTTP_403_FORBIDDEN)
 
     data = request.data
+    question_source = data.get('question_source')
+    questions = data.get('questions')
 
-    return Response("", status=status.HTTP_200_OK)
+    if not question_source:
+        return Response({'error': 'Question source not provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+    quiz = Assessment.objects.create(user=teacher)
+
+    selected_categories = []
+    selected_questions = []
+
+    if question_source == "previous_exam":
+
+        for question in questions:
+            question_obj = Question.objects.get(id=question)
+            selected_questions.append(question_obj)
+            selected_categories.append(question_obj.category.id)
+
+        quiz.selected_categories.set(selected_categories)
+        quiz.questions.set(selected_questions)
+        quiz.deadline = parse_datetime(data.get('deadline')) if data.get('deadline') else None
+        quiz.no_of_questions = data.get('no_of_questions')
+        quiz.status = "created"
+        quiz.class_owner = Class.objects.get(id=class_id)
+        quiz.save()
+
+    elif question_source == "mixed":
+        return Response({'message': 'AI-generated questions feature has not been implemented yet.'},
+                        status=status.HTTP_501_NOT_IMPLEMENTED)
+    else:
+        return Response({'message': 'AI-generated questions feature has not been implemented yet.'},
+                        status=status.HTTP_501_NOT_IMPLEMENTED)
+
+    return Response({"message": "Quiz was successfully created"}, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+def get_all_quizzes(request, class_id):
+    supabase_uid = get_user_id_from_token(request)
+
+    if not supabase_uid:
+        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    teacher = get_object_or_404(User, supabase_user_id=supabase_uid)
+
+    if teacher.role != 'teacher':
+        return Response({"error": "Only teachers can access student data"}, status=status.HTTP_403_FORBIDDEN)
+
+    class_obj = Class.objects.get(id=class_id)
+
+    assessments = Assessment.objects.filter(class_owner=class_obj)
+
+    quizzes_data = []
+
+    for assessment in assessments:
+        quiz_data = {
+            "id": assessment.id,
+            "name": assessment.name,
+            "number_of_questions": assessment.questions.count(),
+            "created_at": assessment.created_at,
+            "deadline": assessment.deadline,
+            "categories": list(assessment.selected_categories.values_list('name', flat=True))
+        }
+        quizzes_data.append(quiz_data)
+
+    return Response(quizzes_data, status=status.HTTP_200_OK)
