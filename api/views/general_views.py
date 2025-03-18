@@ -5,6 +5,7 @@ from ..utils.supabase_client import get_supabase_client
 from ..models import User, Lesson, Chapter, LessonProgress
 from django.shortcuts import get_object_or_404
 
+
 @api_view(['POST'])
 def register_user(request):
     if request.method == 'POST':
@@ -116,6 +117,24 @@ def refresh_token(request):
         return Response({'error': f'Error: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
 
+@api_view(['POST'])
+def logout_user(request):
+    """Logs out the user by revoking their session token."""
+    token = request.headers.get('Authorization')
+
+    if not token:
+        return Response({'error': 'Authorization token required'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    token = token.split("Bearer ")[-1]
+    supabase = get_supabase_client()
+
+    try:
+        supabase.auth.sign_out()
+        return Response({'message': 'Logout successful'}, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({'error': f'Error: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+
 def get_user_id_from_token(request):
     """Helper function to extract the user ID from the Supabase JWT token."""
     token = request.headers.get('Authorization')
@@ -198,6 +217,7 @@ def get_lesson(request, lesson_id):
         }
 
     return Response(lesson_data, status=status.HTTP_200_OK)
+
 
 @api_view(['POST'])
 def update_lesson_progress(request, lesson_id):

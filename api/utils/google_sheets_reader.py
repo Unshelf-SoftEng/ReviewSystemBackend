@@ -44,9 +44,7 @@ def upload_questions_from_sheet(spreadsheet_id, range_name):
 
     if sheet_data:
         for row in sheet_data[1:]:
-            print("Length of Row: ", len(row))
-            if len(row) < 2 or not row[0]:  # Ensure the row has a valid ID
-                print("Skipping empty or incomplete row:", row)
+            if len(row) < 2 or not row[0]:
                 continue
 
             question_id = row[1]
