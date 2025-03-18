@@ -520,3 +520,6 @@ def get_history(request):
         history.append(item)
 
     return Response(history, status=status.HTTP_200_OK)
+
+
+

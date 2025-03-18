@@ -11,6 +11,10 @@ urlpatterns = [
 
     path('refresh-token/', refresh_token, name='refresh_token'),
 
+    path('profile/', get_user_details, name='get_user_details'),
+
+    path('update-password/', update_password, name='update_password'),
+
     # Student Views
 
     path('student/class', get_class, name='get_class'),
@@ -34,6 +38,8 @@ urlpatterns = [
     path('student/quiz/<quiz_id>/submit', submit_exam, name='submit_quiz'),
 
     path('student/quiz/<quiz_id>', get_exam_results, name='get_quiz_results'),
+
+
 
 
     #Lessons

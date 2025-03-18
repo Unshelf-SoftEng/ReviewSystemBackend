@@ -159,11 +159,63 @@ def reset_password(request):
     )
 
 
+@api_view(['POST'])
 def update_password(request):
-    data = request.data
+    supabase_uid = get_user_id_from_token(request)
 
-    password = data.get('password')
-    get_supabase_client().update_user({'password': password})
+    if not supabase_uid:
+        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    try:
+        user = User.objects.get(supabase_user_id=supabase_uid)
+    except User.DoesNotExist:
+        return Response({'error': 'User does not exist.'}, status=status.HTTP_404_NOT_FOUND)
+
+    data = request.data
+    supabase = get_supabase_client()
+    current_password = data.get('current_password')
+    new_password = data.get('new_password')
+
+    try:
+        auth_response = supabase.auth.sign_in_with_password({
+            'email': user.email,
+            'password': current_password
+        })
+        supabase.auth.update_user({'password': new_password})
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    return_data = {
+        'message': 'Password updated successfully',
+        'jwt_token': auth_response.session.access_token,
+        'refresh_token': auth_response.session.refresh_token,
+    }
+
+    return Response(return_data, status=status.HTTP_200_OK)
+
+
+
+
+@api_view(['GET'])
+def get_user_details(request):
+    supabase_uid = get_user_id_from_token(request)
+
+    if not supabase_uid:
+        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    try:
+        user = User.objects.get(supabase_user_id=supabase_uid)
+    except User.DoesNotExist:
+        return Response({'error': 'User does not exist.'}, status=status.HTTP_404_NOT_FOUND)
+
+    user_data = {
+        'first_name': user.first_name,
+        'last_name': user.last_name,
+        'email': user.email,
+        'role': user.role,
+    }
+
+    return Response(user_data, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
