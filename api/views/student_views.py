@@ -1,14 +1,15 @@
+from http import HTTPStatus
+
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 import random
 from ..models import User, Question, Assessment, Answer, AssessmentResult, UserAbility, Category, Class, Lesson, \
-    LessonProgress
+    LessonProgress, Class
 from collections import defaultdict
 from ..ai.estimate_student_ability import estimate_student_ability_per_category
 from api.views.general_views import get_user_id_from_token
 from django.shortcuts import get_object_or_404
-
 
 
 @api_view(['GET'])
@@ -98,8 +99,6 @@ def join_class(request):
 
 @api_view(['GET'])
 def get_initial_exam(request):
-    print("Called the initial exam")
-
     supabase_uid = get_user_id_from_token(request)
 
     if not supabase_uid:
@@ -111,13 +110,47 @@ def get_initial_exam(request):
         return Response({'error': 'User does not not exist.'}, status=status.HTTP_404_NOT_FOUND)
 
     if user.role != 'student':
-        return Response({"error": "You are not authorized to access this link."}, status=403)
+        return Response({"error": "You are not authorized to access this link."}, status=status.HTTP_403_FORBIDDEN)
+
+    if user.enrolled_class is None:
+        return Response({"error": "Student is not enrolled to a class"}, status=status.HTTP_403_FORBIDDEN)
 
     # Retrieve the exam object; ensure that the exam belongs to the authenticated user
-    exam = get_object_or_404(Assessment, id=1)
-    selected_questions = exam.questions.all()
+    exam = get_object_or_404(Assessment, class_owner=user.enrolled_class, is_initial=True)
+
     exam_data = {
         'exam_id': exam.id,
+        'is_open': exam.deadline is not None,
+    }
+
+    return Response(exam_data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+def take_initial_exam(request):
+    supabase_uid = get_user_id_from_token(request)
+
+    if not supabase_uid:
+        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    try:
+        user = User.objects.get(supabase_user_id=supabase_uid)
+    except User.DoesNotExist:
+        return Response({'error': 'User does not exist.'}, status=status.HTTP_404_NOT_FOUND)
+
+    if user.role != 'student':
+        return Response({"error": "You are not authorized to access this link"}, status=403)
+
+    exam = Assessment.objects.filter(class_owner=user.enrolled_class, is_initial=True).first()
+
+    if exam.deadline is None:
+        return Response({'error': 'Exam deadline is not open.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Format the questions and answers to send back to the frontend
+    exam_data = {
+        'exam_id': exam.id,
+        'no_of_items': exam.questions.count(),
+        'time_limit': exam.time_limit,
         'questions': [
             {
                 'question_id': question.id,
@@ -125,9 +158,9 @@ def get_initial_exam(request):
                 'question_text': question.question_text,
                 'choices': list(question.choices.values()),
             }
-            for question in selected_questions
+            for question in exam.questions.all()
         ],
-        'question_ids': [question.id for question in selected_questions],
+        'question_ids': [question.id for question in exam.questions.all()],
     }
 
     return Response(exam_data, status=status.HTTP_200_OK)
@@ -154,25 +187,31 @@ def take_exam(request):
     if not all_questions:
         return Response({'error': 'No questions available to generate an exam.'}, status=status.HTTP_404_NOT_FOUND)
 
-    selected_questions = random.sample(list(all_questions), 5)
+    selected_questions = random.sample(list(all_questions), 1)
 
     # Create a new exam instance for the authenticated user
-    exam = Assessment.objects.create(user=user, type='Exam', time_in_seconds=5400, status="created")
+    exam = Assessment.objects.create(
+        created_by=user,
+        type='Exam',
+        source='student_initiated',
+        status="created"
+    )
 
-    categories = set()  # Use a set to avoid duplicates
+    categories = set()
     for question in selected_questions:
         category = Category.objects.get(id=question.category_id)
         categories.add(category)
 
     exam.selected_categories.set(categories)
     exam.questions.set(selected_questions)
+    exam.time_limit = 90*len(selected_questions)
     exam.status = "in_progress"
     exam.save()
 
     # Format the questions and answers to send back to the frontend
     exam_data = {
         'exam_id': exam.id,
-        'time_in_seconds': exam.time_in_seconds,
+        'time_limit': exam.time_limit,
         'questions': [
             {
                 'question_id': question.id,
@@ -203,11 +242,10 @@ def submit_exam(request, exam_id):
     if user.role != 'student':
         return Response({"error": "You are not authorized to access this link."}, status=status.HTTP_403_FORBIDDEN)
 
+    print("Exam id: " + exam_id)
+
     # Retrieve the exam object
     exam = get_object_or_404(Assessment, id=exam_id)
-
-    if exam.id != 1 and exam.user.supabase_user_id != supabase_uid:
-        return Response({'error': 'You are not authorized to submit answers for this exam.'}, status=status.HTTP_403_FORBIDDEN)
 
     data = request.data
     answers = data.get('answers', [])
@@ -256,7 +294,7 @@ def submit_exam(request, exam_id):
             score += 1
 
         Answer.objects.create(
-            exam_result=exam_result,
+            assessment_result=exam_result,
             question=question,
             time_spent=time_spent,
             chosen_answer=chosen_answer,
@@ -266,12 +304,6 @@ def submit_exam(request, exam_id):
     exam_result.score = score
     exam_result.time_taken = data.get('total_time_taken_seconds', 0)
     exam_result.save()
-
-    if exam.id != 1:
-        exam.status = "Completed"
-        exam.save()
-
-    estimate_student_ability_per_category(user.id)
 
     return Response({'message': 'Exam submitted successfully.'}, status=status.HTTP_201_CREATED)
 
@@ -294,7 +326,7 @@ def get_exam_results(request, exam_id):
     # Retrieve the exam object; ensure that the exam belongs to the authenticated user
     exam = get_object_or_404(Assessment, id=exam_id)
     exam_results = get_object_or_404(AssessmentResult, assessment=exam, user=user)
-    answers = Answer.objects.filter(exam_result=exam_results)
+    answers = Answer.objects.filter(assessment_result=exam_results)
 
     overall_correct_answers = 0
     overall_wrong_answers = 0
@@ -335,7 +367,7 @@ def get_exam_results(request, exam_id):
 
     result_data = {
         'exam_id': exam.id,
-        'student_id': exam.user.id,
+        'student_id': exam_results.user.id,
         'total_time_taken_seconds': exam_results.time_taken,
         'score': exam_results.score,
         'categories': categories,
@@ -396,7 +428,88 @@ def take_quiz(request):
     no_of_questions = data.get('no_of_questions')
     question_source = data.get('question_source')
 
-    source = data.get('source')
+    if question_source == 'previous_exam':
+        # Get all questions from the category
+        all_questions = Question.objects.filter(category_id__in=selected_categories)
+
+        if all_questions.count() < no_of_questions:
+            return Response({'error': 'No questions available to generate an exam.'}, status=status.HTTP_404_NOT_FOUND)
+
+        selected_questions = random.sample(list(all_questions), no_of_questions)
+
+    elif question_source == 'ai_generated':
+        return Response({'message': 'AI-generated questions feature has not been implemented yet.'},
+                        status=status.HTTP_501_NOT_IMPLEMENTED)
+    else:
+        # pe_questions = random.choice(no_of_questions)
+        #
+        # all_questions = Question.objects.filter(category_id__in=selected_categories)
+        #
+        # if not all_questions:
+        #     return Response({'error': 'No questions available to generate an exam'}, status=status.HTTP_404_NOT_FOUND)
+        #
+        # selected_questions = random.sample(list(all_questions), pe_questions)
+
+        return Response({'message': 'AI-generated questions feature has not been implemented yet.'},
+                        status=status.HTTP_501_NOT_IMPLEMENTED)
+
+    categories = set()
+    for c in selected_categories:
+        category = Category.objects.get(id=c)
+        categories.add(category)
+
+    # Create a new exam instance for the authenticated user
+    quiz = Assessment.objects.create(
+        created_by=user,
+        type='Quiz',
+        question_source=question_source,
+        source='student_initiated'
+    )
+
+    quiz.questions.set(selected_questions)
+    quiz.selected_categories.set(categories)
+    quiz.save()
+
+    # Format the questions and answers to send back to the frontend
+    quiz_data = {
+        'quiz_id': quiz.id,
+        'questions': [
+            {
+                'question_id': question.id,
+                'image_url': question.image_url,
+                'question_text': question.question_text,
+                'choices': question.choices
+            }
+            for question in selected_questions
+        ]
+    }
+
+    return Response(quiz_data, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+def take_lesson_quiz(request):
+    supabase_uid = get_user_id_from_token(request)
+
+    if not supabase_uid:
+        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    try:
+        user = User.objects.get(supabase_user_id=supabase_uid)
+    except User.DoesNotExist:
+        return Response({'error': 'User does not exist.'}, status=status.HTTP_404_NOT_FOUND)
+
+    if user.role != 'student':
+        return Response({"error": "You are not authorized to access this link"}, status=403)
+
+    data = request.data
+
+    lesson_name = data.get('lesson')
+
+    lesson = Lesson.objects.get(lesson_name=lesson_name)
+    category = Category.objects.get(name=lesson_name)
+    selected_categories = [category.id]
+    question_source = data.get('question_source')
+    no_of_questions = data.get('no_of_questions')
 
     if question_source == 'previous_exam':
         # Get all questions from the category
@@ -421,27 +534,23 @@ def take_quiz(request):
         # selected_questions = random.sample(list(all_questions), pe_questions)
 
         return Response({'message': 'AI-generated questions feature has not been implemented yet.'},
-                 status=status.HTTP_501_NOT_IMPLEMENTED)
+                        status=status.HTTP_501_NOT_IMPLEMENTED)
 
-    categories = set()
-    for c in selected_categories:
-        print('Finding category', id)
-        category = Category.objects.get(id=c)
+    lesson_quiz = Assessment.objects.create(
+        lesson=lesson,
+        created_by=user,
+        type='Quiz',
+        question_source='previous_exam',
+        source='lesson',
+    )
 
-        print('Found category', category.name)
-
-        categories.add(category)
-
-    # Create a new exam instance for the authenticated user
-    quiz = Assessment.objects.create(user=user, type='Quiz', source=source)
-
-    quiz.questions.set(selected_questions)
-    quiz.selected_categories.set(categories)
-    quiz.save()
+    lesson_quiz.selected_categories.set(selected_categories)
+    lesson_quiz.questions.set(selected_questions)
+    lesson_quiz.save()
 
     # Format the questions and answers to send back to the frontend
     quiz_data = {
-        'quiz_id': quiz.id,
+        'quiz_id': lesson_quiz.id,
         'questions': [
             {
                 'question_id': question.id,
@@ -455,8 +564,10 @@ def take_quiz(request):
 
     return Response(quiz_data, status=status.HTTP_200_OK)
 
+
+
 @api_view(['GET'])
-def get_quizzes(request):
+def get_class_assessments(request):
     supabase_uid = get_user_id_from_token(request)
 
     if not supabase_uid:
@@ -470,10 +581,22 @@ def get_quizzes(request):
     if user.role != 'student':
         return Response({"error": "You are not authorized to access this link"}, status=403)
 
+    class_owner = Class.objects.get(id=user.enrolled_class.id)
+    assessments = Assessment.objects.filter(class_owner=class_owner, type='quiz')
 
-    quizzes = []
+    assessments_data = {
+        'assessments': [
+            {
+                'assessment_id': assessment.id,
+                'assessment_name': assessment.assessment_name,
+                'assessment_type': assessment.type,
+                'assessment_items': assessment.questions.count(),
+            }
+            for assessment in assessments
+        ]
+    }
 
-    return Response(quizzes, status=status.HTTP_200_OK)
+    return Response(assessments_data, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
@@ -520,6 +643,3 @@ def get_history(request):
         history.append(item)
 
     return Response(history, status=status.HTTP_200_OK)
-
-
-

@@ -4,11 +4,15 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d83e15d4-b2c8-4a76-9aca-4b58469163cd" name="Changes" comment="feat: Add log out">
+    <list default="true" id="d83e15d4-b2c8-4a76-9aca-4b58469163cd" name="Changes" comment="feat: Added Get User Details and Update Password">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/api/ai/estimate_student_ability.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/ai/estimate_student_ability.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/api/management/commands/upload_initial_exam.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/api/models.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/models.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/api/urls.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/urls.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/api/views/general_views.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/views/general_views.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/api/views/student_views.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/views/student_views.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/api/views/teacher_views.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/views/teacher_views.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -136,7 +140,7 @@
       <workItem from="1741671744914" duration="35160000" />
       <workItem from="1742229483619" duration="829000" />
       <workItem from="1742290016191" duration="500000" />
-      <workItem from="1742320942475" duration="3853000" />
+      <workItem from="1742320942475" duration="13044000" />
     </task>
     <task id="LOCAL-00001" summary="feat: Add login and registration using Supabase">
       <option name="closed" value="true" />
@@ -418,7 +422,15 @@
       <option name="project" value="LOCAL" />
       <updated>1742290338056</updated>
     </task>
-    <option name="localTasksCounter" value="36" />
+    <task id="LOCAL-00036" summary="feat: Added Get User Details and Update Password">
+      <option name="closed" value="true" />
+      <created>1742327474972</created>
+      <option name="number" value="00036" />
+      <option name="presentableId" value="LOCAL-00036" />
+      <option name="project" value="LOCAL" />
+      <updated>1742327474972</updated>
+    </task>
+    <option name="localTasksCounter" value="37" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -468,6 +480,7 @@
     <MESSAGE value="feat: Create a route for getting the initial exam" />
     <MESSAGE value="feat: Add lesson upload from Sheets &amp; implement lesson models&#10;&#10;Implemented lesson uploading from Google Sheets&#10;Created Lesson, Chapter, and LessonProgress models" />
     <MESSAGE value="feat: Add log out" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: Add log out" />
+    <MESSAGE value="feat: Added Get User Details and Update Password" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: Added Get User Details and Update Password" />
   </component>
 </project>

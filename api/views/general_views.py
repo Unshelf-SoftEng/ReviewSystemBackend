@@ -48,8 +48,6 @@ def register_user(request):
                 return Response({'error': 'Email already registered'}, status=status.HTTP_400_BAD_REQUEST)
             return Response({'error': f'Error: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
-
-# Login view (still incomplete, but here is the structure)
 @api_view(['POST'])
 def login_user(request):
     if request.method == 'POST':

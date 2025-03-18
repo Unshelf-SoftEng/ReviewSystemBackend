@@ -28,12 +28,51 @@ def create_class(request):
     # Create class and save students
     new_class = Class.objects.create(name=class_name, teacher=user)
 
-    return Response({"message": "Class created successfully", "class_id": new_class.id, "class_code": new_class.class_code}, status=201)
+    # Create initial assessment
+
+    question_ids = [
+        '24-A-1', '24-A-2', '24-A-3', '24-A-4', '24-A-5',
+        '24-A-6', '24-A-7', '24-A-8', '24-A-9', '24-A-10',
+        '24-A-11', '24-A-12', '24-A-13', '24-A-14', '24-A-15',
+        '24-A-16', '24-A-17', '24-A-18', '24-A-19', '24-A-20',
+        '24-A-21', '24-A-22', '24-A-23', '24-A-24', '24-A-25',
+        '24-A-26', '24-A-27', '24-A-28', '24-A-29', '24-A-30',
+        '24-A-31', '24-A-32', '24-A-33', '24-A-34', '24-A-35',
+        '24-A-36', '24-A-37', '24-A-38', '24-A-39', '24-A-40',
+        '24-A-41', '24-A-42', '24-A-43', '24-A-44', '24-A-45',
+        '24-A-46', '24-A-47', '24-A-48', '24-A-49', '24-A-50',
+        '24-A-51', '24-A-52', '24-A-53', '24-A-54', '24-A-55',
+        '24-A-56', '24-A-57', '24-A-58', '24-A-59', '24-A-60',
+    ]
+
+    exam = Assessment.objects.create(
+        name='Initial Assessment',
+        class_owner=new_class,
+        type='exam',
+        status='created',
+        question_source='previous_exam',
+        source='admin_generated',
+        time_limit=8100,
+        is_initial=True,
+    )
+
+    questions = Question.objects.filter(pk__in=question_ids)
+
+    selected_categories = []
+    for question in questions:
+        if question.category not in selected_categories:
+            selected_categories.append(question.category)
+
+    exam.selected_categories.set(selected_categories)
+    exam.questions.set(questions)
+
+    return Response(
+        {"message": "Class created successfully", "class_id": new_class.id, "class_code": new_class.class_code},
+        status=201)
 
 
 @api_view(['GET'])
 def get_classes(request):
-
     supabase_uid = get_user_id_from_token(request)
 
     if not supabase_uid:
@@ -84,6 +123,57 @@ def get_class(request, class_id):
     }
 
     return Response({"class": data_result}, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+def view_initial_exam(request, class_id):
+    supabase_uid = get_user_id_from_token(request)
+
+    if not supabase_uid:
+        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    user = User.objects.get(supabase_user_id=supabase_uid)
+
+    if user.role != 'teacher':
+        return Response({"error": "Only teachers can get classes"}, status=status.HTTP_403_FORBIDDEN)
+
+    class_owner = Class.objects.get(id=class_id)
+
+    # Retrieve the exam object; ensure that the exam belongs to the authenticated user
+    exam = get_object_or_404(Assessment, class_owner=class_owner, is_initial=True)
+
+    exam_data = {
+        'exam_id': exam.id,
+        'is_open': exam.deadline is not None,
+    }
+
+    return Response(exam_data, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+def open_initial_exam(request, class_id):
+    supabase_uid = get_user_id_from_token(request)
+
+    if not supabase_uid:
+        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    user = User.objects.get(supabase_user_id=supabase_uid)
+
+    if user.role != 'teacher':
+        return Response({"error": "Only teachers can get classes"}, status=403)
+
+    data = request.data
+
+    deadline = data['deadline']
+
+    class_owner = Class.objects.get(id=class_id)
+
+    exam = Assessment.objects.get(class_owner=class_owner, is_initial=True)
+
+    exam.deadline = deadline
+    exam.save()
+
+    return Response({'message': 'Initial Exam is Opened'}, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
@@ -158,6 +248,7 @@ def get_all_questions(request):
         response_data.append(question_data)
 
     return Response(response_data, status=status.HTTP_200_OK)
+
 
 @api_view(['POST'])
 def create_quiz(request, class_id):

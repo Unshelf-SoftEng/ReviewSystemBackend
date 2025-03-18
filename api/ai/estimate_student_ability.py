@@ -48,8 +48,8 @@ def estimate_student_ability_per_category(user_id):
 
     print(user_id)
 
-    assessments = Assessment.objects.filter(user_id=user_id).order_by("id")
-    all_answers = Answer.objects.filter(exam_result__assessment__in=assessments)
+    results = AssessmentResult.objects.filter(user_id=user_id)
+    all_answers = Answer.objects.filter(assessment_result__in=results)
 
     if not all_answers.exists():
         return {"error": "Student has not taken any assessments."}
