@@ -259,7 +259,7 @@ def take_exam(request):
 
 
 @api_view(['POST'])
-def submit_exam(request, exam_id):
+def submit_assessment(request, assessment_id):
     supabase_uid = get_user_id_from_token(request)
 
     if not supabase_uid:
@@ -273,10 +273,8 @@ def submit_exam(request, exam_id):
     if user.role != 'student':
         return Response({"error": "You are not authorized to access this link."}, status=status.HTTP_403_FORBIDDEN)
 
-    print("Exam id: " + exam_id)
-
     # Retrieve the exam object
-    exam = get_object_or_404(Assessment, id=exam_id)
+    exam = get_object_or_404(Assessment, id=assessment_id)
 
     data = request.data
     answers = data.get('answers', [])
@@ -304,7 +302,7 @@ def submit_exam(request, exam_id):
         return Response({'error': 'Exam was already taken.'}, status=status.HTTP_400_BAD_REQUEST)
 
     # Create exam result entry
-    exam_result = AssessmentResult.objects.create(
+    assessment_result = AssessmentResult.objects.create(
         assessment=exam,
         score=0,
         time_taken=0,
@@ -325,16 +323,16 @@ def submit_exam(request, exam_id):
             score += 1
 
         Answer.objects.create(
-            assessment_result=exam_result,
+            assessment_result=assessment_result,
             question=question,
             time_spent=time_spent,
             chosen_answer=chosen_answer,
             is_correct=is_correct
         )
 
-    exam_result.score = score
-    exam_result.time_taken = data.get('total_time_taken_seconds', 0)
-    exam_result.save()
+    assessment_result.score = score
+    assessment_result.time_taken = data.get('total_time_taken_seconds', 0)
+    assessment_result.save()
 
     return Response({'message': 'Exam submitted successfully.'}, status=status.HTTP_201_CREATED)
 

@@ -29,9 +29,9 @@ urlpatterns = [
 
     path('student/exam/take', student_views.take_exam, name='take_exam'),
 
-    path('student/exam/<exam_id>/submit', student_views.submit_exam, name='submit_answers'),
+    path('student/exam/<exam_id>/submit', student_views.submit_assessment, name='submit_exam'),
 
-    path('student/exam/<exam_id>', student_views.get_exam_results, name='get_exam_results'),
+    path('student/exam/<assessment_id>', student_views.get_exam_results, name='get_exam_results'),
 
     path('student/ability', student_views.get_ability, name='get_student_abilities'),
 
@@ -39,7 +39,7 @@ urlpatterns = [
 
     path('student/quiz/take', student_views.take_quiz, name='take_quiz'),
 
-    path('student/quiz/<quiz_id>/submit', student_views.submit_exam, name='submit_quiz'),
+    path('student/quiz/<assessment_id>/submit', student_views.submit_assessment, name='submit_quiz'),
 
     path('student/quiz/take-lesson-quiz', student_views.take_lesson_quiz, name='take_lesson_quiz'),
 
@@ -75,7 +75,9 @@ urlpatterns = [
 
     path('teacher/class/<class_id>/open-initial-exam', teacher_views.open_initial_exam, name='open_initial_exam'),
 
-    path('teacher/class/<class_id>/quiz', teacher_views.get_all_quizzes, name='get_all_quizzes'),
+    path('teacher/class/<class_id>/assessments', teacher_views.get_class_assessments, name='get_all_quizzes'),
+
+    path('teacher/class/<class_id>/assessment/<assessment_id>', teacher_views.get_class_assessment, name='get_class_assessment'),
 
     path('teacher/class/<int:class_id>', teacher_views.get_class, name='get_teacher_class'),
 

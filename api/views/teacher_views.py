@@ -277,11 +277,12 @@ def create_quiz(request, class_id):
     question_source = data.get('question_source')
     questions = data.get('questions')
 
+
     if not question_source:
         return Response({'error': 'Question source not provided'}, status=status.HTTP_400_BAD_REQUEST)
 
     class_owner = Class.objects.get(id=class_id)
-    quiz = Assessment.objects.create(class_owner=class_owner)
+    quiz = Assessment.objects.create(name=data.get('name'), class_owner=class_owner)
 
     selected_categories = []
     selected_questions = []
@@ -297,6 +298,7 @@ def create_quiz(request, class_id):
         quiz.questions.set(selected_questions)
         quiz.deadline = parse_datetime(data.get('deadline')) if data.get('deadline') else None
         quiz.no_of_questions = data.get('no_of_questions')
+        quiz.type = "quiz"
         quiz.status = "created"
         quiz.source = "teacher_generated"
         quiz.save()
@@ -312,7 +314,7 @@ def create_quiz(request, class_id):
 
 
 @api_view(['GET'])
-def get_all_quizzes(request, class_id):
+def get_class_assessments(request, class_id):
     print("Get All Quizzes was called")
 
     supabase_uid = get_user_id_from_token(request)
@@ -335,11 +337,70 @@ def get_all_quizzes(request, class_id):
         quiz_data = {
             "id": assessment.id,
             "name": assessment.name,
+            "type": assessment.type,
+            "question_source": assessment.question_source,
             "number_of_questions": assessment.questions.count(),
             "created_at": assessment.created_at,
             "deadline": assessment.deadline,
             "categories": list(assessment.selected_categories.values_list('name', flat=True))
+
         }
         quizzes_data.append(quiz_data)
 
     return Response(quizzes_data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+def get_class_assessment(request, class_id, assessment_id):
+    supabase_uid = get_user_id_from_token(request)
+
+    if not supabase_uid:
+        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    teacher = get_object_or_404(User, supabase_user_id=supabase_uid)
+
+    if teacher.role != 'teacher':
+        return Response({"error": "Only teachers can access student data"}, status=status.HTTP_403_FORBIDDEN)
+
+    class_obj = Class.objects.get(id=class_id)
+    assessment = get_object_or_404(Assessment, id=assessment_id)
+
+    students = User.objects.filter(enrolled_class=class_obj)
+
+    students_data = []
+
+    total_score = 0
+
+    for student in students:
+
+        assessment_result = AssessmentResult.objects.get(assessment=assessment, user=student)
+
+        if assessment_result is not None:
+            students_data.append({
+                "student_id": student.id,
+                "student_name": student.full_name,
+                "taken": True,
+                "score": assessment_result.score
+            })
+
+            total_score += assessment_result.score
+        else:
+            students_data.append({
+                "taken": False,
+            })
+
+    response_data = {
+        "id": assessment.id,
+        "name": assessment.name,
+        "type": assessment.type,
+        "question_source": assessment.question_source,
+        "source": assessment.source,
+        "no_of_items": assessment.questions.count(),
+        "average_score": total_score/students.count(),
+        "students_data": students_data,
+    }
+
+    if assessment.deadline is not None:
+        response_data["deadline"] = assessment.deadline
+
+    return Response(response_data, status=status.HTTP_200_OK)
