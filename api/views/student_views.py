@@ -143,6 +143,9 @@ def take_initial_exam(request):
 
     exam = Assessment.objects.filter(class_owner=user.enrolled_class, is_initial=True).first()
 
+    if exam is None:
+        return Response({"error": "Can't find initial exam"}, status=status.HTTP_404_NOT_FOUND)
+
     if exam.deadline is None:
         return Response({'error': 'Exam deadline is not open.'}, status=status.HTTP_400_BAD_REQUEST)
 
