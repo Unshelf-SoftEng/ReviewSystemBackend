@@ -206,24 +206,21 @@ def get_student_data(request, student_id):
     if student.role != 'student':
         return Response({"error": "Student ID specified is not a student"}, status=status.HTTP_403_FORBIDDEN)
 
-    user_abilities = UserAbility.objects.filter(user_id=student_id)
-    stored_abilities = {user_ability.category.name: user_ability.ability_level for user_ability in user_abilities}
+    user_ability = UserAbility.objects.filter(user_id=student_id)
+    stored_abilities = {user_ability.category.name: user_ability.ability_level for user_ability in user_ability}
 
-    assessments = Assessment.objects.filter(user_id=student_id).prefetch_related('selected_categories')
+    assessment_results = AssessmentResult.objects.filter(user=student)
 
     history = []
-    for assessment in assessments:
-        result = AssessmentResult.objects.filter(assessment=assessment).first()  # Avoid exceptions
-
-        if not result:
-            continue
+    for assessment_result in assessment_results:
+        assessment = assessment_result.assessment
 
         item = {
             'assessment_id': assessment.id,
             'type': assessment.type,
-            'score': result.score,
+            'score': assessment_result.score,
             'total_items': assessment.questions.count(),
-            'time_taken': result.time_taken,
+            'time_taken': assessment_result.time_taken,
             'date_taken': assessment.created_at,
             'categories': [category.name for category in assessment.selected_categories.all()]
         }

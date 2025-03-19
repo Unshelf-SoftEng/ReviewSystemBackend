@@ -5,7 +5,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="d83e15d4-b2c8-4a76-9aca-4b58469163cd" name="Changes" comment="fix: Errors in teacher views">
-      <change beforePath="$PROJECT_DIR$/api/urls.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/urls.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/api/views/teacher_views.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/views/teacher_views.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -134,7 +135,7 @@
       <workItem from="1742229483619" duration="829000" />
       <workItem from="1742290016191" duration="500000" />
       <workItem from="1742320942475" duration="13217000" />
-      <workItem from="1742387674871" duration="7750000" />
+      <workItem from="1742387674871" duration="8196000" />
     </task>
     <task id="LOCAL-00001" summary="feat: Add login and registration using Supabase">
       <option name="closed" value="true" />
@@ -472,7 +473,15 @@
       <option name="project" value="LOCAL" />
       <updated>1742398418792</updated>
     </task>
-    <option name="localTasksCounter" value="43" />
+    <task id="LOCAL-00043" summary="fix: Errors in teacher views">
+      <option name="closed" value="true" />
+      <created>1742399170909</created>
+      <option name="number" value="00043" />
+      <option name="presentableId" value="LOCAL-00043" />
+      <option name="project" value="LOCAL" />
+      <updated>1742399170909</updated>
+    </task>
+    <option name="localTasksCounter" value="44" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
