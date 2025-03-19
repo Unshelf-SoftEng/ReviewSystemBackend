@@ -494,7 +494,7 @@ def take_quiz(request):
                 'question_id': question.id,
                 'image_url': question.image_url,
                 'question_text': question.question_text,
-                'choices': question.choices
+                'choices': list(question.choices.values()),
             }
             for question in selected_questions
         ]
