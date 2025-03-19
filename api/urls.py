@@ -29,7 +29,7 @@ urlpatterns = [
 
     path('student/exam/take', student_views.take_exam, name='take_exam'),
 
-    path('student/exam/<exam_id>/submit', student_views.submit_assessment, name='submit_exam'),
+    path('student/exam/<assessment_id>/submit', student_views.submit_assessment, name='submit_exam'),
 
     path('student/exam/<assessment_id>', student_views.get_exam_results, name='get_exam_results'),
 
