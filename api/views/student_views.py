@@ -338,7 +338,7 @@ def submit_assessment(request, assessment_id):
 
 
 @api_view(['GET'])
-def get_exam_results(request, exam_id):
+def get_exam_results(request, assessment_id):
     supabase_uid = get_user_id_from_token(request)
 
     if not supabase_uid:
@@ -353,7 +353,7 @@ def get_exam_results(request, exam_id):
         return Response({"error": "You are not authorized to access this link."}, status=403)
 
     # Retrieve the exam object; ensure that the exam belongs to the authenticated user
-    exam = get_object_or_404(Assessment, id=exam_id)
+    exam = get_object_or_404(Assessment, id=assessment_id)
     exam_results = get_object_or_404(AssessmentResult, assessment=exam, user=user)
     answers = Answer.objects.filter(assessment_result=exam_results)
 
