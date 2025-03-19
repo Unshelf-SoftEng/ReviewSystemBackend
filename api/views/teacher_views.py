@@ -101,6 +101,7 @@ def get_classes(request):
 
 @api_view(['GET'])
 def get_class(request, class_id):
+    print("Get Class was called with class_id:", class_id)  # Debugging line
     supabase_uid = get_user_id_from_token(request)
 
     if not supabase_uid:
@@ -112,12 +113,19 @@ def get_class(request, class_id):
         return Response({"error": "Only teachers can get classes"}, status=403)
 
     teacher_class = Class.objects.get(id=class_id)
-    students = [{'id': student.id, 'name': student.full_name} for student in teacher_class.students.all()]
+    students_data = User.objects.filter(enrolled_class=teacher_class)
+
+    students = []
+    for student in students_data:
+        students.append({
+            'id': student.id,
+            'name': student.full_name
+        })
 
     data_result = {
         'class_id': class_id,
         'class_name': teacher_class.name,
-        'number_of_students': teacher_class.students.count(),
+        'number_of_students': students_data.count(),
         'class_code': teacher_class.class_code,
         'students': students
     }
@@ -127,6 +135,7 @@ def get_class(request, class_id):
 
 @api_view(['GET'])
 def view_initial_exam(request, class_id):
+    print("View Initial Exam was called")
     supabase_uid = get_user_id_from_token(request)
 
     if not supabase_uid:
@@ -252,6 +261,7 @@ def get_all_questions(request):
 
 @api_view(['POST'])
 def create_quiz(request, class_id):
+    print("Create Quiz was Called")
     supabase_uid = get_user_id_from_token(request)
 
     if not supabase_uid:
@@ -301,6 +311,8 @@ def create_quiz(request, class_id):
 
 @api_view(['GET'])
 def get_all_quizzes(request, class_id):
+    print("Get All Quizzes was called")
+
     supabase_uid = get_user_id_from_token(request)
 
     if not supabase_uid:
