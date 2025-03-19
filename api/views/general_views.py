@@ -67,13 +67,18 @@ def login_user(request):
 
             user = User.objects.get(supabase_user_id=auth_response.user.id)
             role = user.role
+            first_name = user.first_name
+            last_name = user.last_name
 
-            # Return success response with role information
+            
+            # Return success response with role and user information
             return Response({
                 'message': 'Login successful',
                 'jwt_token': auth_response.session.access_token,
                 'refresh_token': auth_response.session.refresh_token,
-                'role': role
+                'role': role,
+                'first_name': first_name,
+                'last_name': last_name
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
