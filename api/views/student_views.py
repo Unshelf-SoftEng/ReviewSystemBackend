@@ -123,7 +123,35 @@ def get_initial_exam(request):
         'is_open': exam.deadline is not None,
     }
 
+    if exam.deadline:
+        exam_data['deadline'] = exam.deadline
+
     return Response(exam_data, status=status.HTTP_200_OK)
+
+
+def initial_exam_taken(request):
+    supabase_uid = get_user_id_from_token(request)
+
+    if not supabase_uid:
+        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    try:
+        user = User.objects.get(supabase_user_id=supabase_uid)
+    except User.DoesNotExist:
+        return Response({'error': 'User does not not exist.'}, status=status.HTTP_404_NOT_FOUND)
+
+    if user.role != 'student':
+        return Response({"error": "You are not authorized to access this link."}, status=status.HTTP_403_FORBIDDEN)
+
+    if user.enrolled_class is None:
+        return Response({"error": "Student is not enrolled to a class"}, status=status.HTTP_403_FORBIDDEN)
+
+    # Retrieve the exam object; ensure that the exam belongs to the authenticated user
+    exam = get_object_or_404(Assessment, class_owner=user.enrolled_class, is_initial=True)
+
+    exam_result = AssessmentResult.objects.filter(exam=exam, user=user)
+
+    return Response({"taken": exam_result.exists()})
 
 
 @api_view(['GET'])
@@ -207,7 +235,7 @@ def take_exam(request):
 
     exam.selected_categories.set(categories)
     exam.questions.set(selected_questions)
-    exam.time_limit = 90*len(selected_questions)
+    exam.time_limit = 90 * len(selected_questions)
     exam.status = "in_progress"
     exam.save()
 
@@ -489,6 +517,7 @@ def take_quiz(request):
 
     return Response(quiz_data, status=status.HTTP_200_OK)
 
+
 @api_view(['GET'])
 def take_lesson_quiz(request):
     supabase_uid = get_user_id_from_token(request)
@@ -566,7 +595,6 @@ def take_lesson_quiz(request):
     }
 
     return Response(quiz_data, status=status.HTTP_200_OK)
-
 
 
 @api_view(['GET'])

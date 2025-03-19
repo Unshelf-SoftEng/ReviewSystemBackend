@@ -25,6 +25,8 @@ urlpatterns = [
 
     path('student/take-initial-exam', take_initial_exam, name='take_initial_exam'),
 
+    path('student/initial-exam-taken', initial_exam_taken, name='initial_exam_taken'),
+
     path('student/exam/take', take_exam, name='take_exam'),
 
     path('student/exam/<exam_id>/submit', submit_exam, name='submit_answers'),
