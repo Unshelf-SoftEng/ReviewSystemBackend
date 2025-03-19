@@ -452,13 +452,13 @@ def take_quiz(request):
     if user.role != 'student':
         return Response({"error": "You are not authorized to access this link"}, status=403)
 
-    data = request.data
-    selected_categories = data.get('selected_categories')
-    no_of_questions = data.get('no_of_questions')
-    question_source = data.get('question_source')
+    selected_categories = request.GET.getlist('selected_categories')
+    selected_categories = list(map(int, selected_categories)) if selected_categories else []
+
+    no_of_questions = int(request.GET.get('no_of_questions', 5))
+    question_source = request.GET.get('question_source')
 
     if question_source == 'previous_exam':
-        # Get all questions from the category
         all_questions = Question.objects.filter(category_id__in=selected_categories)
 
         if all_questions.count() < no_of_questions:
@@ -469,25 +469,13 @@ def take_quiz(request):
     elif question_source == 'ai_generated':
         return Response({'message': 'AI-generated questions feature has not been implemented yet.'},
                         status=status.HTTP_501_NOT_IMPLEMENTED)
-    else:
-        # pe_questions = random.choice(no_of_questions)
-        #
-        # all_questions = Question.objects.filter(category_id__in=selected_categories)
-        #
-        # if not all_questions:
-        #     return Response({'error': 'No questions available to generate an exam'}, status=status.HTTP_404_NOT_FOUND)
-        #
-        # selected_questions = random.sample(list(all_questions), pe_questions)
 
+    else:
         return Response({'message': 'AI-generated questions feature has not been implemented yet.'},
                         status=status.HTTP_501_NOT_IMPLEMENTED)
 
-    categories = set()
-    for c in selected_categories:
-        category = Category.objects.get(id=c)
-        categories.add(category)
+    categories = Category.objects.filter(id__in=selected_categories)
 
-    # Create a new exam instance for the authenticated user
     quiz = Assessment.objects.create(
         created_by=user,
         type='Quiz',
@@ -499,7 +487,6 @@ def take_quiz(request):
     quiz.selected_categories.set(categories)
     quiz.save()
 
-    # Format the questions and answers to send back to the frontend
     quiz_data = {
         'quiz_id': quiz.id,
         'questions': [
@@ -514,6 +501,7 @@ def take_quiz(request):
     }
 
     return Response(quiz_data, status=status.HTTP_200_OK)
+
 
 
 @api_view(['GET'])
