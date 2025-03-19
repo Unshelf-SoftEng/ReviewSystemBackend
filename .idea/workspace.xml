@@ -4,9 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d83e15d4-b2c8-4a76-9aca-4b58469163cd" name="Changes" comment="feat: Add a route to see if initial exam was taken">
+    <list default="true" id="d83e15d4-b2c8-4a76-9aca-4b58469163cd" name="Changes" comment="fix: Conflict with routings">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/api/urls.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/urls.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/api/views/teacher_views.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/views/teacher_views.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -136,7 +135,7 @@
       <workItem from="1742229483619" duration="829000" />
       <workItem from="1742290016191" duration="500000" />
       <workItem from="1742320942475" duration="13217000" />
-      <workItem from="1742387674871" duration="6316000" />
+      <workItem from="1742387674871" duration="7016000" />
     </task>
     <task id="LOCAL-00001" summary="feat: Add login and registration using Supabase">
       <option name="closed" value="true" />
@@ -458,7 +457,15 @@
       <option name="project" value="LOCAL" />
       <updated>1742396569172</updated>
     </task>
-    <option name="localTasksCounter" value="41" />
+    <task id="LOCAL-00041" summary="fix: Conflict with routings">
+      <option name="closed" value="true" />
+      <created>1742397683452</created>
+      <option name="number" value="00041" />
+      <option name="presentableId" value="LOCAL-00041" />
+      <option name="project" value="LOCAL" />
+      <updated>1742397683452</updated>
+    </task>
+    <option name="localTasksCounter" value="42" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -485,7 +492,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="chore: Deploy backend on Railway&#10;&#10;- Ensured the app is accessible via the domain." />
     <MESSAGE value="feat: Add class management API&#10;&#10;- Implement API endpoints for class creation and retrieving all classes&#10;- Add functionality to generate unique class codes for student enrollment&#10;- Implement API endpoint for students to join classes using class code" />
     <MESSAGE value="feat: Add endpoints for refreshing JWT token" />
     <MESSAGE value="chore: Enable credentials and allow custom headers in CORS" />
@@ -510,6 +516,7 @@
     <MESSAGE value="feat: Update Assessments" />
     <MESSAGE value="feat: Add error handling in take initial exam" />
     <MESSAGE value="feat: Add a route to see if initial exam was taken" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: Add a route to see if initial exam was taken" />
+    <MESSAGE value="fix: Conflict with routings" />
+    <option name="LAST_COMMIT_MESSAGE" value="fix: Conflict with routings" />
   </component>
 </project>

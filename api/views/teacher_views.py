@@ -113,6 +113,10 @@ def get_class(request, class_id):
         return Response({"error": "Only teachers can get classes"}, status=403)
 
     teacher_class = Class.objects.get(id=class_id)
+
+    if teacher_class is None:
+        return Response({"error": "Class not found."}, status=status.HTTP_404_NOT_FOUND)
+
     students_data = User.objects.filter(enrolled_class=teacher_class)
 
     students = []
@@ -279,7 +283,8 @@ def create_quiz(request, class_id):
     if not question_source:
         return Response({'error': 'Question source not provided'}, status=status.HTTP_400_BAD_REQUEST)
 
-    quiz = Assessment.objects.create(user=teacher)
+    class_owner = Class.objects.get(id=class_id)
+    quiz = Assessment.objects.create(class_owner=class_owner)
 
     selected_categories = []
     selected_questions = []
@@ -296,7 +301,7 @@ def create_quiz(request, class_id):
         quiz.deadline = parse_datetime(data.get('deadline')) if data.get('deadline') else None
         quiz.no_of_questions = data.get('no_of_questions')
         quiz.status = "created"
-        quiz.class_owner = Class.objects.get(id=class_id)
+        quiz.source = "teacher_generated"
         quiz.save()
 
     elif question_source == "mixed":
