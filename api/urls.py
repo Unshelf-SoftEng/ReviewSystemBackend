@@ -17,7 +17,7 @@ urlpatterns = [
 
     # Student Views
 
-    path('student/class', student_views.get_class, name='get_class'),
+    path('student/class', student_views.get_class, name='get_student_class'),
 
     path('student/class/join', student_views.join_class, name='join_class'),
 
@@ -77,6 +77,6 @@ urlpatterns = [
 
     path('teacher/class/<class_id>/quiz', teacher_views.get_all_quizzes, name='get_all_quizzes'),
 
-    path('teacher/class/<int:class_id>', teacher_views.get_class, name='get_class'),
+    path('teacher/class/<int:class_id>', teacher_views.get_class, name='get_teacher_class'),
 
 ]

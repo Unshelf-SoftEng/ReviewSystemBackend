@@ -4,9 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d83e15d4-b2c8-4a76-9aca-4b58469163cd" name="Changes" comment="fix: Conflict with routings">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/api/views/teacher_views.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/views/teacher_views.py" afterDir="false" />
+    <list default="true" id="d83e15d4-b2c8-4a76-9aca-4b58469163cd" name="Changes" comment="fix: Errors in teacher views">
+      <change beforePath="$PROJECT_DIR$/api/urls.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/urls.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -135,7 +134,7 @@
       <workItem from="1742229483619" duration="829000" />
       <workItem from="1742290016191" duration="500000" />
       <workItem from="1742320942475" duration="13217000" />
-      <workItem from="1742387674871" duration="7016000" />
+      <workItem from="1742387674871" duration="7750000" />
     </task>
     <task id="LOCAL-00001" summary="feat: Add login and registration using Supabase">
       <option name="closed" value="true" />
@@ -465,7 +464,15 @@
       <option name="project" value="LOCAL" />
       <updated>1742397683452</updated>
     </task>
-    <option name="localTasksCounter" value="42" />
+    <task id="LOCAL-00042" summary="fix: Errors in teacher views">
+      <option name="closed" value="true" />
+      <created>1742398418792</created>
+      <option name="number" value="00042" />
+      <option name="presentableId" value="LOCAL-00042" />
+      <option name="project" value="LOCAL" />
+      <updated>1742398418792</updated>
+    </task>
+    <option name="localTasksCounter" value="43" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -492,7 +499,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="feat: Add class management API&#10;&#10;- Implement API endpoints for class creation and retrieving all classes&#10;- Add functionality to generate unique class codes for student enrollment&#10;- Implement API endpoint for students to join classes using class code" />
     <MESSAGE value="feat: Add endpoints for refreshing JWT token" />
     <MESSAGE value="chore: Enable credentials and allow custom headers in CORS" />
     <MESSAGE value="feat: Add ability estimation" />
@@ -517,6 +523,7 @@
     <MESSAGE value="feat: Add error handling in take initial exam" />
     <MESSAGE value="feat: Add a route to see if initial exam was taken" />
     <MESSAGE value="fix: Conflict with routings" />
-    <option name="LAST_COMMIT_MESSAGE" value="fix: Conflict with routings" />
+    <MESSAGE value="fix: Errors in teacher views" />
+    <option name="LAST_COMMIT_MESSAGE" value="fix: Errors in teacher views" />
   </component>
 </project>
