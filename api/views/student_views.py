@@ -151,7 +151,7 @@ def initial_exam_taken(request):
 
     exam_result = AssessmentResult.objects.filter(exam=exam, user=user)
 
-    return Response({"taken": exam_result.exists()})
+    return Response({"taken": exam_result.exists()}, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])

@@ -4,10 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d83e15d4-b2c8-4a76-9aca-4b58469163cd" name="Changes" comment="feat: Add error handling in take initial exam">
-      <change afterPath="$PROJECT_DIR$/api/management/commands/create_initial_assessments.py" afterDir="false" />
+    <list default="true" id="d83e15d4-b2c8-4a76-9aca-4b58469163cd" name="Changes" comment="feat: Add a route to see if initial exam was taken">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/api/urls.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/urls.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/api/views/student_views.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/views/student_views.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -137,7 +135,7 @@
       <workItem from="1742229483619" duration="829000" />
       <workItem from="1742290016191" duration="500000" />
       <workItem from="1742320942475" duration="13217000" />
-      <workItem from="1742387674871" duration="5171000" />
+      <workItem from="1742387674871" duration="5249000" />
     </task>
     <task id="LOCAL-00001" summary="feat: Add login and registration using Supabase">
       <option name="closed" value="true" />
@@ -443,7 +441,15 @@
       <option name="project" value="LOCAL" />
       <updated>1742388051782</updated>
     </task>
-    <option name="localTasksCounter" value="39" />
+    <task id="LOCAL-00039" summary="feat: Add a route to see if initial exam was taken">
+      <option name="closed" value="true" />
+      <created>1742396517676</created>
+      <option name="number" value="00039" />
+      <option name="presentableId" value="LOCAL-00039" />
+      <option name="project" value="LOCAL" />
+      <updated>1742396517676</updated>
+    </task>
+    <option name="localTasksCounter" value="40" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -470,7 +476,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="feat: Add endpoints for taking exams, submitting scores, and fetching results" />
     <MESSAGE value="chore: Deploy backend on Railway&#10;&#10;- Ensured the app is accessible via the domain." />
     <MESSAGE value="feat: Add class management API&#10;&#10;- Implement API endpoints for class creation and retrieving all classes&#10;- Add functionality to generate unique class codes for student enrollment&#10;- Implement API endpoint for students to join classes using class code" />
     <MESSAGE value="feat: Add endpoints for refreshing JWT token" />
@@ -495,6 +500,7 @@
     <MESSAGE value="feat: Added Get User Details and Update Password" />
     <MESSAGE value="feat: Update Assessments" />
     <MESSAGE value="feat: Add error handling in take initial exam" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: Add error handling in take initial exam" />
+    <MESSAGE value="feat: Add a route to see if initial exam was taken" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: Add a route to see if initial exam was taken" />
   </component>
 </project>
