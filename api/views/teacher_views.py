@@ -368,7 +368,7 @@ def get_assessment_data(request, assessment_id):
         questions_data.append({
             "id": question.id,
             "question_text": question.question_text,
-            "choices": list(question.choices.values()),
+            "choices": question.choices,
             "answer": question.correct_answer
         })
 
@@ -433,7 +433,8 @@ def get_assessment_results(request, assessment_id):
     }, status=status.HTTP_200_OK)
 
 
-def update_quiz(request, quiz_id):
+@api_view(['POST'])
+def update_assessment(request, assessment_id):
     supabase_uid = get_user_id_from_token(request)
 
     if not supabase_uid:
@@ -444,24 +445,25 @@ def update_quiz(request, quiz_id):
     if teacher.role != 'teacher':
         return Response({"error": "You are not authorized to access this link"}, status=status.HTTP_403_FORBIDDEN)
 
-    questions = request.data
-    assessment = get_object_or_404(Assessment, id=quiz_id)
-    deadline = parse_datetime(data.get('deadline')) if data.get('deadline') else None
+    questions = request.data.get('questions')
+    assessment = get_object_or_404(Assessment, id=assessment_id)
+    deadline = parse_datetime(request.data.get('deadline')) if request.data.get('deadline') else None
     assessment.deadline = deadline
     assessment.save()
 
     for question_data in questions:
-        question = Question.objects.filter(id=question_data["id"])
+        question = Question.objects.filter(id=question_data["id"]).first()
 
-        if question.exists():
-            question.image_url = question_data["image_url"]
+        if question:
             question.question_text = question_data["question_text"]
             question.choices = question_data["choices"]
+            question.correct_answer = question_data["answer"]
+            question.save()
 
     return Response({"message": "Quiz was successfully updated"}, status=status.HTTP_200_OK)
 
 
-def delete_quiz(request, quiz_id):
+def delete_assessment(request, quiz_id):
     supabase_uid = get_user_id_from_token(request)
 
     if not supabase_uid:
