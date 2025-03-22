@@ -664,22 +664,39 @@ def get_history(request):
 
     history = []
     for result in assessment_results:
+        selected_categories = result.assessment.selected_categories
+        categories = []
 
-        # categories =
-        #
-        # item = {
-        #     'assessment_id': assessment.id,
-        #     'type': assessment.type,
-        #     'score': result.score,
-        #     'total_items': assessment.questions.count(),
-        #     'time_taken': result.time_taken,
-        #     'date_taken': assessment.created_at,
-        #     'categories': categories,
-        #     'question_source': assessment.question_source,
-        #     'source': assessment.source
-        # }
-        #
+        for category_id in selected_categories:
+            category = Category.objects.get(id=category_id)
 
+            # Get answers related to the category
+            answers = Answer.objects.filter(
+                assessment_result=result,
+                question__category=category  # Assuming Question model has a category field
+            )
+
+            correct_answers = answers.filter(is_correct=True).count()
+            wrong_answers = answers.filter(is_correct=False).count()
+
+            categories.append({
+                'category_name': category.name,
+                'correct_answer': correct_answers,
+                'wrong_answer': wrong_answers
+            })
+
+
+        item = {
+            'assessment_id': result.assessment.id,
+            'type': result.assessment.type,
+            'score': result.score,
+            'total_items': result.assessment.questions.count(),
+            'time_taken': result.time_taken,
+            'date_taken': result.assessment.created_at,
+            'question_source': result.assessment.question_source,
+            'source': result.assessment.source,
+            'categories': categories,
+        }
         history.append(item)
 
     return Response(history, status=status.HTTP_200_OK)

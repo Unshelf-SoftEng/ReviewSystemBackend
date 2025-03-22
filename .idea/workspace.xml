@@ -4,9 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d83e15d4-b2c8-4a76-9aca-4b58469163cd" name="Changes" comment="feat: Add Quizzes Data">
+    <list default="true" id="d83e15d4-b2c8-4a76-9aca-4b58469163cd" name="Changes" comment="feat: Add Assessment Progress with time remaining to validate time">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/api/models.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/models.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/api/views/student_views.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/views/student_views.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -138,7 +137,7 @@
       <workItem from="1742320942475" duration="13217000" />
       <workItem from="1742387674871" duration="10366000" />
       <workItem from="1742582035879" duration="2018000" />
-      <workItem from="1742642860504" duration="7049000" />
+      <workItem from="1742642860504" duration="7513000" />
     </task>
     <task id="LOCAL-00001" summary="feat: Add login and registration using Supabase">
       <option name="closed" value="true" />
@@ -500,7 +499,15 @@
       <option name="project" value="LOCAL" />
       <updated>1742401782798</updated>
     </task>
-    <option name="localTasksCounter" value="46" />
+    <task id="LOCAL-00046" summary="feat: Add Assessment Progress with time remaining to validate time">
+      <option name="closed" value="true" />
+      <created>1742658239372</created>
+      <option name="number" value="00046" />
+      <option name="presentableId" value="LOCAL-00046" />
+      <option name="project" value="LOCAL" />
+      <updated>1742658239372</updated>
+    </task>
+    <option name="localTasksCounter" value="47" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -527,7 +534,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="feat: Add ability estimation" />
     <MESSAGE value="fix: Update API methods to reflect changes from 'Exam' to 'Assessment' model" />
     <MESSAGE value="fix: Allow any localhost origins" />
     <MESSAGE value="feat: DQN Agent and generate_question probability" />
@@ -552,6 +558,7 @@
     <MESSAGE value="fix: Errors in teacher views" />
     <MESSAGE value="fix: Fix Get Student Data" />
     <MESSAGE value="feat: Add Quizzes Data" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: Add Quizzes Data" />
+    <MESSAGE value="feat: Add Assessment Progress with time remaining to validate time" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: Add Assessment Progress with time remaining to validate time" />
   </component>
 </project>
