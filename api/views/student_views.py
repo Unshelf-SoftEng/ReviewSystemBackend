@@ -258,6 +258,7 @@ def take_exam(request):
 
     return Response(exam_data, status=status.HTTP_200_OK)
 
+
 def check_time_limit(request):
     supabase_uid = get_user_id_from_token(request)
 
@@ -532,7 +533,6 @@ def take_quiz(request):
     return Response(quiz_data, status=status.HTTP_200_OK)
 
 
-
 @api_view(['GET'])
 def take_lesson_quiz(request):
     supabase_uid = get_user_id_from_token(request)
@@ -664,16 +664,17 @@ def get_history(request):
 
     history = []
     for result in assessment_results:
-        selected_categories = result.assessment.selected_categories
+        selected_categories = result.assessment.selected_categories.all()
         categories = []
 
-        for category_id in selected_categories:
-            category = Category.objects.get(id=category_id)
+        print(selected_categories)
+
+        for category in selected_categories:
 
             # Get answers related to the category
             answers = Answer.objects.filter(
                 assessment_result=result,
-                question__category=category  # Assuming Question model has a category field
+                question__category=category
             )
 
             correct_answers = answers.filter(is_correct=True).count()
@@ -684,7 +685,6 @@ def get_history(request):
                 'correct_answer': correct_answers,
                 'wrong_answer': wrong_answers
             })
-
 
         item = {
             'assessment_id': result.assessment.id,
