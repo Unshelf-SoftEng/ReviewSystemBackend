@@ -4,12 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d83e15d4-b2c8-4a76-9aca-4b58469163cd" name="Changes" comment="fix: Added category scores on student quiz history">
+    <list default="true" id="d83e15d4-b2c8-4a76-9aca-4b58469163cd" name="Changes" comment="fix: Added more error handling">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/api/models.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/models.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/api/urls.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/urls.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/api/views/student_views.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/views/student_views.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/api/views/teacher_views.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/views/teacher_views.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -140,15 +138,7 @@
       <workItem from="1742320942475" duration="13217000" />
       <workItem from="1742387674871" duration="10366000" />
       <workItem from="1742582035879" duration="2018000" />
-      <workItem from="1742642860504" duration="14692000" />
-    </task>
-    <task id="LOCAL-00001" summary="feat: Add login and registration using Supabase">
-      <option name="closed" value="true" />
-      <created>1733744246684</created>
-      <option name="number" value="00001" />
-      <option name="presentableId" value="LOCAL-00001" />
-      <option name="project" value="LOCAL" />
-      <updated>1733744246684</updated>
+      <workItem from="1742642860504" duration="17965000" />
     </task>
     <task id="LOCAL-00002" summary="feat: Add endpoints for taking exams, submitting scores, and fetching results">
       <option name="closed" value="true" />
@@ -534,7 +524,15 @@
       <option name="project" value="LOCAL" />
       <updated>1742666287061</updated>
     </task>
-    <option name="localTasksCounter" value="50" />
+    <task id="LOCAL-00050" summary="fix: Added more error handling">
+      <option name="closed" value="true" />
+      <created>1742670059001</created>
+      <option name="number" value="00050" />
+      <option name="presentableId" value="LOCAL-00050" />
+      <option name="project" value="LOCAL" />
+      <updated>1742670059001</updated>
+    </task>
+    <option name="localTasksCounter" value="51" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -561,7 +559,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="feat: update DQN Agent" />
     <MESSAGE value="refactor: separate views by general, student, and teachers" />
     <MESSAGE value="refactor: update question upload and exam submission logic&#10;&#10;- Refactored Upload Question Commands to process all questions from the sheet  &#10;- Updated `submit_exam` to improve correct_answer lookup  &#10;- Ensured better handling of question data and choices formatting" />
     <MESSAGE value="fix: Updated processes" />
@@ -586,6 +583,7 @@
     <MESSAGE value="feat: Add Scores Per Category in History" />
     <MESSAGE value="feat: Add Edit and Delete Teacher Generated Quiz" />
     <MESSAGE value="fix: Added category scores on student quiz history" />
-    <option name="LAST_COMMIT_MESSAGE" value="fix: Added category scores on student quiz history" />
+    <MESSAGE value="fix: Added more error handling" />
+    <option name="LAST_COMMIT_MESSAGE" value="fix: Added more error handling" />
   </component>
 </project>

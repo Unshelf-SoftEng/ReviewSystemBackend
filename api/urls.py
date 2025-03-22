@@ -27,6 +27,8 @@ urlpatterns = [
 
     path('student/initial-exam-taken', student_views.initial_exam_taken, name='initial_exam_taken'),
 
+    path('student/assessment/<int:assessment_id>/time-limit', student_views.check_time_limit, name='check_time_limit'),
+
     path('student/exam/take', student_views.take_exam, name='take_exam'),
 
     path('student/exam/<assessment_id>/submit', student_views.submit_assessment, name='submit_exam'),

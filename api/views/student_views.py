@@ -1,10 +1,9 @@
-from datetime import datetime
+from datetime import timedelta
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 import random
 from django.utils import timezone
-
 from unicodedata import category
 
 from ..models import User, Question, Assessment, Answer, AssessmentResult, UserAbility, Category, Class, Lesson, \
@@ -201,6 +200,12 @@ def take_initial_exam(request):
         'question_ids': [question.id for question in exam.questions.all()],
     }
 
+    AssessmentProgress.objects.get_or_create(
+        assessment=exam,
+        user=user,
+        defaults={'start_time': timezone.now()}
+    )
+
     return Response(exam_data, status=status.HTTP_200_OK)
 
 
@@ -242,10 +247,11 @@ def take_exam(request):
     exam.selected_categories.set(categories)
     exam.questions.set(selected_questions)
     exam.time_limit = 90 * len(selected_questions)
-    exam.status = "in_progress"
     exam.save()
 
-    AssessmentProgress.objects.create(assessment=exam, user=user)
+    if exam.deadline is not None:
+        AssessmentProgress.objects.create(assessment=exam, user=user)
+
 
     # Format the questions and answers to send back to the frontend
     exam_data = {
@@ -266,7 +272,8 @@ def take_exam(request):
     return Response(exam_data, status=status.HTTP_200_OK)
 
 
-def check_time_limit(request):
+@api_view(['GET'])
+def check_time_limit(request, assessment_id):
     supabase_uid = get_user_id_from_token(request)
 
     if not supabase_uid:
@@ -280,17 +287,15 @@ def check_time_limit(request):
     if user.role != 'student':
         return Response({"error": "You are not authorized to access this link"}, status=status.HTTP_403_FORBIDDEN)
 
-    # Fetch the latest assessment progress for the user
-    progress = get_object_or_404(AssessmentProgress, user=user)
+    progress = get_object_or_404(AssessmentProgress, user=user, assessment_id=assessment_id)
 
     # Ensure assessment has a time limit field
     if not hasattr(progress.assessment, 'time_limit'):
         return Response({"error": "Assessment time limit not found"}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Calculate time left
-    elapsed_time = (datetime.now() - progress.start_time).total_seconds()
-    total_time_allowed = progress.assessment.time_limit * 60  # Assuming time_limit is in minutes
-    time_left = max(0, total_time_allowed - elapsed_time)  # Prevents negative values
+    elapsed_time = (timezone.now() - progress.start_time).total_seconds()
+    total_time_allowed = progress.assessment.time_limit
+    time_left = max(0, total_time_allowed - elapsed_time)
 
     return Response({"time_left": int(time_left)}, status=status.HTTP_200_OK)
 
@@ -313,9 +318,22 @@ def submit_assessment(request, assessment_id):
     # Retrieve the exam object
     assessment = get_object_or_404(Assessment, id=assessment_id)
 
-    if assessment.deadline and assessment.deadline < timezone.now():
-        return Response({'error': 'The deadline for this assessment has already passed.'},
-                        status=status.HTTP_400_BAD_REQUEST)
+    if assessment.deadline:
+        assessment_progress = AssessmentProgress.objects.filter(user=user, assessment=assessment).first()
+        time_elapsed = (timezone.now() - assessment_progress.start_time).total_seconds()
+
+        is_auto_submission = time_elapsed >= assessment.time_limit if assessment.time_limit else False
+
+        if not is_auto_submission:
+            # Prevent manual submission after the deadline
+            if assessment.deadline and assessment.deadline < timezone.now():
+                return Response({'error': 'The deadline for this assessment has already passed.'},
+                                status=status.HTTP_400_BAD_REQUEST)
+        # else:
+        #     # Allow auto-submission even if it's slightly past the deadline
+        #     if assessment.deadline and assessment.deadline + timedelta(minutes=2) < timezone.now():
+        #         return Response({'error': 'Auto-submission failed due to excessive delay.'},
+        #                         status=status.HTTP_400_BAD_REQUEST)
 
     # Check if exam was already taken
     if AssessmentResult.objects.filter(assessment=assessment, user=user).exists():
@@ -370,7 +388,7 @@ def submit_assessment(request, assessment_id):
 
 
 @api_view(['GET'])
-def get_exam_results(request, assessment_id, answer):
+def get_exam_results(request, assessment_id):
     supabase_uid = get_user_id_from_token(request)
 
     if not supabase_uid:
@@ -435,7 +453,7 @@ def get_exam_results(request, assessment_id, answer):
         'overall_correct_answers': overall_correct_answers,
         'overall_wrong_answers': overall_wrong_answers,
         'total_questions': len(exam.questions.all()),
-        'answers': serialized_answers,  # Include answers in response
+        'answers': serialized_answers,
     }
 
     return Response(result_data, status=status.HTTP_200_OK)
@@ -619,17 +637,24 @@ def get_class_assessments(request):
     assessments_data = []
 
     for assessment in assessments:
-
         was_taken = AssessmentResult.objects.filter(assessment=assessment, user=user).exists()
         is_open = assessment.deadline is None or assessment.deadline >= timezone.now()
+        in_progress = AssessmentProgress.objects.filter(assessment=assessment, user=user).exists()
+
+        if was_taken:
+            assessment_status = 'Completed'
+        elif in_progress:
+            assessment_status = 'In progress'
+        else:
+            assessment_status = 'Not Started'
 
         data = {
             'id': assessment.id,
             'name': assessment.name,
             'type': assessment.type,
             'items': assessment.questions.count(),
-            'was_taken': was_taken,
-            'is_open': is_open
+            'is_open': is_open,
+            'status': assessment_status
         }
 
         if assessment.deadline:
