@@ -1,7 +1,8 @@
+from pyasn1_modules.rfc2315 import data
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from ..models import User, Class, UserAbility, Assessment, AssessmentResult, Question
+from ..models import User, Class, UserAbility, Assessment, AssessmentResult, Question, AssessmentProgress
 from django.shortcuts import get_object_or_404
 from django.utils.dateparse import parse_datetime
 from api.views.general_views import get_user_id_from_token
@@ -277,7 +278,6 @@ def create_quiz(request, class_id):
     question_source = data.get('question_source')
     questions = data.get('questions')
 
-
     if not question_source:
         return Response({'error': 'Question source not provided'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -351,7 +351,7 @@ def get_class_assessments(request, class_id):
 
 
 @api_view(['GET'])
-def get_class_assessment(request, class_id, assessment_id):
+def get_assessment(request, class_id, assessment_id):
     supabase_uid = get_user_id_from_token(request)
 
     if not supabase_uid:
@@ -389,6 +389,15 @@ def get_class_assessment(request, class_id, assessment_id):
                 "taken": False,
             })
 
+    questions_data = []
+    for question in assessment.questions.all():
+        data = {
+            "id": question.id,
+            "question_text": question.question_text,
+            "choices": question.choices,
+        }
+        questions_data.append(data)
+
     response_data = {
         "id": assessment.id,
         "name": assessment.name,
@@ -396,7 +405,8 @@ def get_class_assessment(request, class_id, assessment_id):
         "question_source": assessment.question_source,
         "source": assessment.source,
         "no_of_items": assessment.questions.count(),
-        "average_score": total_score/students.count(),
+        "average_score": total_score / students.count(),
+        "questions": questions_data,
         "students_data": students_data,
     }
 
@@ -404,3 +414,58 @@ def get_class_assessment(request, class_id, assessment_id):
         response_data["deadline"] = assessment.deadline
 
     return Response(response_data, status=status.HTTP_200_OK)
+
+
+def update_quiz(request, quiz_id):
+    supabase_uid = get_user_id_from_token(request)
+
+    if not supabase_uid:
+        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    teacher = get_object_or_404(User, supabase_user_id=supabase_uid)
+
+    if teacher.role != 'teacher':
+        return Response({"error": "You are not authorized to access this link"}, status=status.HTTP_403_FORBIDDEN)
+
+    questions = request.data
+    assessment = get_object_or_404(Assessment, id=quiz_id)
+    deadline = parse_datetime(data.get('deadline')) if data.get('deadline') else None
+    assessment.deadline = deadline
+    assessment.save()
+
+    for question_data in questions:
+        question = Question.objects.filter(id=question_data["id"])
+
+        if question.exists():
+            question.image_url = question_data["image_url"]
+            question.question_text = question_data["question_text"]
+            question.choices = question_data["choices"]
+
+    return Response({"message": "Quiz was successfully updated"}, status=status.HTTP_200_OK)
+
+
+def delete_quiz(request, quiz_id):
+    supabase_uid = get_user_id_from_token(request)
+
+    if not supabase_uid:
+        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    teacher = get_object_or_404(User, supabase_user_id=supabase_uid)
+
+    if teacher.role != 'teacher':
+        return Response({"error": "Only teachers can access student data"}, status=status.HTTP_403_FORBIDDEN)
+
+    assessment = get_object_or_404(Assessment, id=quiz_id)
+
+    # Check for related AssessmentResult or AssessmentProgress
+    has_results = AssessmentResult.objects.filter(assessment=assessment).exists()
+    has_progress = AssessmentProgress.objects.filter(assessment=assessment).exists()
+
+    if has_results or has_progress:
+        return Response(
+            {"error": "Cannot delete assessment because there are related results or progress records."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    assessment.delete()
+    return Response({"success": "Assessment deleted successfully."}, status=status.HTTP_204_NO_CONTENT)

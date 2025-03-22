@@ -61,6 +61,8 @@ class Question(models.Model):
     guessing = models.FloatField(default=0.0)
     choices = models.JSONField()
     correct_answer = models.CharField(max_length=255)
+    is_ai_generated = models.BooleanField(default=False)
+
 
     def __str__(self):
         return self.question_text

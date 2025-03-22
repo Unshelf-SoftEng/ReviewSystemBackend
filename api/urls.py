@@ -77,7 +77,7 @@ urlpatterns = [
 
     path('teacher/class/<class_id>/assessments', teacher_views.get_class_assessments, name='get_all_quizzes'),
 
-    path('teacher/class/<class_id>/assessment/<assessment_id>', teacher_views.get_class_assessment, name='get_class_assessment'),
+    path('teacher/class/<class_id>/assessment/<assessment_id>', teacher_views.get_assessment, name='get_class_assessment'),
 
     path('teacher/class/<int:class_id>', teacher_views.get_class, name='get_teacher_class'),
 
