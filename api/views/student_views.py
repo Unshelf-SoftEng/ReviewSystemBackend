@@ -1,11 +1,10 @@
-from http import HTTPStatus
-
+from datetime import datetime
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 import random
 from ..models import User, Question, Assessment, Answer, AssessmentResult, UserAbility, Category, Class, Lesson, \
-    LessonProgress, Class
+    LessonProgress, Class, AssessmentProgress
 from collections import defaultdict
 from ..ai.estimate_student_ability import estimate_student_ability_per_category
 from api.views.general_views import get_user_id_from_token
@@ -239,6 +238,8 @@ def take_exam(request):
     exam.status = "in_progress"
     exam.save()
 
+    AssessmentProgress.objects.create(assessment=exam, user=user)
+
     # Format the questions and answers to send back to the frontend
     exam_data = {
         'exam_id': exam.id,
@@ -256,6 +257,34 @@ def take_exam(request):
     }
 
     return Response(exam_data, status=status.HTTP_200_OK)
+
+def check_time_limit(request):
+    supabase_uid = get_user_id_from_token(request)
+
+    if not supabase_uid:
+        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    try:
+        user = User.objects.get(supabase_user_id=supabase_uid)
+    except User.DoesNotExist:
+        return Response({'error': 'User does not exist.'}, status=status.HTTP_404_NOT_FOUND)
+
+    if user.role != 'student':
+        return Response({"error": "You are not authorized to access this link"}, status=status.HTTP_403_FORBIDDEN)
+
+    # Fetch the latest assessment progress for the user
+    progress = get_object_or_404(AssessmentProgress, user=user)
+
+    # Ensure assessment has a time limit field
+    if not hasattr(progress.assessment, 'time_limit'):
+        return Response({"error": "Assessment time limit not found"}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Calculate time left
+    elapsed_time = (datetime.now() - progress.start_time).total_seconds()
+    total_time_allowed = progress.assessment.time_limit * 60  # Assuming time_limit is in minutes
+    time_left = max(0, total_time_allowed - elapsed_time)  # Prevents negative values
+
+    return Response({"time_left": int(time_left)}, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
@@ -631,31 +660,25 @@ def get_history(request):
     if user.role != 'student':
         return Response({"error": "You are not authorized to access this link"}, status=403)
 
-    assessments = Assessment.objects.filter(user_id=user.id).prefetch_related('selected_categories')
+    assessment_results = AssessmentResult.objects.filter(user_id=user.id)
 
     history = []
-    for assessment in assessments:
-        result = AssessmentResult.objects.filter(assessment=assessment).first()
+    for result in assessment_results:
 
-        # Skip if no result exists
-        if not result:
-            continue
-
-        categories = list(assessment.selected_categories.values_list('name', flat=True))
-
-        print(categories)
-
-        item = {
-            'assessment_id': assessment.id,
-            'type': assessment.type,
-            'score': result.score,
-            'total_items': assessment.questions.count(),
-            'time_taken': result.time_taken,
-            'date_taken': assessment.created_at,
-            'categories': categories,
-            'question_source': assessment.question_source,
-            'source': assessment.source
-        }
+        # categories =
+        #
+        # item = {
+        #     'assessment_id': assessment.id,
+        #     'type': assessment.type,
+        #     'score': result.score,
+        #     'total_items': assessment.questions.count(),
+        #     'time_taken': result.time_taken,
+        #     'date_taken': assessment.created_at,
+        #     'categories': categories,
+        #     'question_source': assessment.question_source,
+        #     'source': assessment.source
+        # }
+        #
 
         history.append(item)
 

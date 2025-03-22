@@ -4,11 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d83e15d4-b2c8-4a76-9aca-4b58469163cd" name="Changes" comment="fix: Fix Get Student Data">
+    <list default="true" id="d83e15d4-b2c8-4a76-9aca-4b58469163cd" name="Changes" comment="feat: Add Quizzes Data">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/api/urls.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/urls.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/api/models.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/models.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/api/views/student_views.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/views/student_views.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/api/views/teacher_views.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/views/teacher_views.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -137,7 +136,9 @@
       <workItem from="1742229483619" duration="829000" />
       <workItem from="1742290016191" duration="500000" />
       <workItem from="1742320942475" duration="13217000" />
-      <workItem from="1742387674871" duration="10285000" />
+      <workItem from="1742387674871" duration="10366000" />
+      <workItem from="1742582035879" duration="2018000" />
+      <workItem from="1742642860504" duration="7049000" />
     </task>
     <task id="LOCAL-00001" summary="feat: Add login and registration using Supabase">
       <option name="closed" value="true" />
@@ -491,7 +492,15 @@
       <option name="project" value="LOCAL" />
       <updated>1742399694138</updated>
     </task>
-    <option name="localTasksCounter" value="45" />
+    <task id="LOCAL-00045" summary="feat: Add Quizzes Data">
+      <option name="closed" value="true" />
+      <created>1742401782798</created>
+      <option name="number" value="00045" />
+      <option name="presentableId" value="LOCAL-00045" />
+      <option name="project" value="LOCAL" />
+      <updated>1742401782798</updated>
+    </task>
+    <option name="localTasksCounter" value="46" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -518,7 +527,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="chore: Enable credentials and allow custom headers in CORS" />
     <MESSAGE value="feat: Add ability estimation" />
     <MESSAGE value="fix: Update API methods to reflect changes from 'Exam' to 'Assessment' model" />
     <MESSAGE value="fix: Allow any localhost origins" />
@@ -543,6 +551,7 @@
     <MESSAGE value="fix: Conflict with routings" />
     <MESSAGE value="fix: Errors in teacher views" />
     <MESSAGE value="fix: Fix Get Student Data" />
-    <option name="LAST_COMMIT_MESSAGE" value="fix: Fix Get Student Data" />
+    <MESSAGE value="feat: Add Quizzes Data" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: Add Quizzes Data" />
   </component>
 </project>
