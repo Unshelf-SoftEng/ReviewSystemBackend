@@ -3,6 +3,10 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 import random
+from django.utils import timezone
+
+from unicodedata import category
+
 from ..models import User, Question, Assessment, Answer, AssessmentResult, UserAbility, Category, Class, Lesson, \
     LessonProgress, Class, AssessmentProgress
 from collections import defaultdict
@@ -176,6 +180,10 @@ def take_initial_exam(request):
     if exam.deadline is None:
         return Response({'error': 'Exam deadline is not open.'}, status=status.HTTP_400_BAD_REQUEST)
 
+    if exam.deadline and exam.deadline < timezone.now():
+        return Response({'error': 'The deadline for this assessment has already passed.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
     # Format the questions and answers to send back to the frontend
     exam_data = {
         'exam_id': exam.id,
@@ -224,7 +232,6 @@ def take_exam(request):
         created_by=user,
         type='Exam',
         source='student_initiated',
-        status="created"
     )
 
     categories = set()
@@ -304,7 +311,15 @@ def submit_assessment(request, assessment_id):
         return Response({"error": "You are not authorized to access this link."}, status=status.HTTP_403_FORBIDDEN)
 
     # Retrieve the exam object
-    exam = get_object_or_404(Assessment, id=assessment_id)
+    assessment = get_object_or_404(Assessment, id=assessment_id)
+
+    if assessment.deadline and assessment.deadline < timezone.now():
+        return Response({'error': 'The deadline for this assessment has already passed.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    # Check if exam was already taken
+    if AssessmentResult.objects.filter(assessment=assessment, user=user).exists():
+        return Response({'error': 'Exam was already taken.'}, status=status.HTTP_400_BAD_REQUEST)
 
     data = request.data
     answers = data.get('answers', [])
@@ -312,53 +327,40 @@ def submit_assessment(request, assessment_id):
     if not answers:
         return Response({'error': 'No answers provided.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Get the question IDs from the assessment
-    assessment = Assessment.objects.get(id=exam.id)
-    assessment_question_ids = set(assessment.questions.values_list('id', flat=True))
-
-    # Get the question IDs from the answers
-    answer_question_ids = set(answer_data.get('question_id') for answer_data in answers)
-
-    # Check if the provided question IDs match the assessment questions
-    if answer_question_ids != assessment_question_ids:
-        return Response({
-            'error': 'Submitted answers do not match the assessment questions.',
-            'missing_questions': list(assessment_question_ids - answer_question_ids),
-            'extra_questions': list(answer_question_ids - assessment_question_ids),
-        }, status=status.HTTP_400_BAD_REQUEST)
-
-    # Check if exam was already taken
-    if AssessmentResult.objects.filter(assessment=assessment, user=user).exists():
-        return Response({'error': 'Exam was already taken.'}, status=status.HTTP_400_BAD_REQUEST)
-
-    # Create exam result entry
+    # Create an assessment result
     assessment_result = AssessmentResult.objects.create(
-        assessment=exam,
+        assessment=assessment,
         score=0,
         time_taken=0,
         user=user
     )
 
+    assessment_questions = {q.id: q for q in assessment.questions.all()}
+
+    answers_to_create = []
     score = 0
-    for answer_data in answers:
-        question_id = answer_data.get('question_id')
-        chosen_answer = answer_data.get('answer')
-        time_spent = answer_data.get('time_spent', 0)
 
-        question = get_object_or_404(Question, id=question_id)
-        correct_answer = question.choices[question.correct_answer]
+    for question in assessment_questions.values():
+        answer_data = next((a for a in answers if a["question_id"] == question.id), None)
 
-        is_correct = chosen_answer == correct_answer
-        if is_correct:
-            score += 1
+        if answer_data:
+            chosen_answer = answer_data.get('answer')
+            time_spent = answer_data.get('time_spent', 0)
+            correct_answer = question.choices[question.correct_answer]
 
-        Answer.objects.create(
-            assessment_result=assessment_result,
-            question=question,
-            time_spent=time_spent,
-            chosen_answer=chosen_answer,
-            is_correct=is_correct
-        )
+            is_correct = chosen_answer == correct_answer
+            if is_correct:
+                score += 1
+
+            answers_to_create.append(Answer(
+                assessment_result=assessment_result,
+                question=question,
+                time_spent=time_spent,
+                chosen_answer=chosen_answer,
+                is_correct=is_correct
+            ))
+
+    Answer.objects.bulk_create(answers_to_create)
 
     assessment_result.score = score
     assessment_result.time_taken = data.get('total_time_taken_seconds', 0)
@@ -368,7 +370,7 @@ def submit_assessment(request, assessment_id):
 
 
 @api_view(['GET'])
-def get_exam_results(request, assessment_id):
+def get_exam_results(request, assessment_id, answer):
     supabase_uid = get_user_id_from_token(request)
 
     if not supabase_uid:
@@ -432,7 +434,7 @@ def get_exam_results(request, assessment_id):
         'categories': categories,
         'overall_correct_answers': overall_correct_answers,
         'overall_wrong_answers': overall_wrong_answers,
-        'total_questions': len(answers),
+        'total_questions': len(exam.questions.all()),
         'answers': serialized_answers,  # Include answers in response
     }
 
@@ -467,8 +469,8 @@ def get_ability(request):
     }, status=status.HTTP_200_OK)
 
 
-@api_view(['GET'])
-def take_quiz(request):
+@api_view(['POST'])
+def create_student_quiz(request):
     supabase_uid = get_user_id_from_token(request)
 
     if not supabase_uid:
@@ -482,11 +484,15 @@ def take_quiz(request):
     if user.role != 'student':
         return Response({"error": "You are not authorized to access this link"}, status=403)
 
-    selected_categories = request.GET.getlist('selected_categories')
-    selected_categories = list(map(int, selected_categories)) if selected_categories else []
+    print(request.data)
 
-    no_of_questions = int(request.GET.get('no_of_questions', 5))
-    question_source = request.GET.get('question_source')
+    selected_categories = request.data.get('selected_categories', [])
+    selected_categories = [int(cat) for cat in selected_categories] if selected_categories else []
+
+    print(selected_categories)
+
+    no_of_questions = int(request.data.get('no_of_questions', 5))
+    question_source = request.data.get('question_source')
 
     if question_source == 'previous_exam':
         all_questions = Question.objects.filter(category_id__in=selected_categories)
@@ -555,33 +561,14 @@ def take_lesson_quiz(request):
     lesson = Lesson.objects.get(lesson_name=lesson_name)
     category = Category.objects.get(name=lesson_name)
     selected_categories = [category.id]
-    question_source = data.get('question_source')
     no_of_questions = data.get('no_of_questions')
 
-    if question_source == 'previous_exam':
-        # Get all questions from the category
-        all_questions = Question.objects.filter(category_id__in=selected_categories)
+    all_questions = Question.objects.filter(category_id__in=selected_categories)
 
-        if all_questions.count() < no_of_questions:
-            return Response({'error': 'No questions available to generate an exam.'}, status=status.HTTP_404_NOT_FOUND)
+    if all_questions.count() < no_of_questions:
+        return Response({'error': 'No questions available to generate an exam.'}, status=status.HTTP_404_NOT_FOUND)
 
-        selected_questions = random.sample(list(all_questions), no_of_questions)
-
-    elif question_source == 'ai_generated':
-        return Response({'message': 'AI-generated questions feature has not been implemented yet.'},
-                        status=status.HTTP_501_NOT_IMPLEMENTED)
-    else:
-        # pe_questions = random.choice(no_of_questions)
-        #
-        # all_questions = Question.objects.filter(category_id__in=selected_categories)
-        #
-        # if not all_questions:
-        #     return Response({'error': 'No questions available to generate an exam'}, status=status.HTTP_404_NOT_FOUND)
-        #
-        # selected_questions = random.sample(list(all_questions), pe_questions)
-
-        return Response({'message': 'AI-generated questions feature has not been implemented yet.'},
-                        status=status.HTTP_501_NOT_IMPLEMENTED)
+    selected_questions = random.sample(list(all_questions), no_of_questions)
 
     lesson_quiz = Assessment.objects.create(
         lesson=lesson,
@@ -628,19 +615,27 @@ def get_class_assessments(request):
         return Response({"error": "You are not authorized to access this link"}, status=403)
 
     class_owner = Class.objects.get(id=user.enrolled_class.id)
-    assessments = Assessment.objects.filter(class_owner=class_owner, type='quiz')
+    assessments = Assessment.objects.filter(class_owner=class_owner).order_by('-created_at')
+    assessments_data = []
 
-    assessments_data = {
-        'assessments': [
-            {
-                'assessment_id': assessment.id,
-                'assessment_name': assessment.assessment_name,
-                'assessment_type': assessment.type,
-                'assessment_items': assessment.questions.count(),
-            }
-            for assessment in assessments
-        ]
-    }
+    for assessment in assessments:
+
+        was_taken = AssessmentResult.objects.filter(assessment=assessment, user=user).exists()
+        is_open = assessment.deadline is None or assessment.deadline >= timezone.now()
+
+        data = {
+            'id': assessment.id,
+            'name': assessment.name,
+            'type': assessment.type,
+            'items': assessment.questions.count(),
+            'was_taken': was_taken,
+            'is_open': is_open
+        }
+
+        if assessment.deadline:
+            data.update({'deadline': assessment.deadline})
+
+        assessments_data.append(data)
 
     return Response(assessments_data, status=status.HTTP_200_OK)
 
@@ -670,7 +665,6 @@ def get_history(request):
         print(selected_categories)
 
         for category in selected_categories:
-
             # Get answers related to the category
             answers = Answer.objects.filter(
                 assessment_result=result,

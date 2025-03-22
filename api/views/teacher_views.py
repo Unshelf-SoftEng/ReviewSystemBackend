@@ -46,11 +46,10 @@ def create_class(request):
         '24-A-56', '24-A-57', '24-A-58', '24-A-59', '24-A-60',
     ]
 
-    exam = Assessment.objects.create(
+    assessment = Assessment.objects.create(
         name='Initial Assessment',
         class_owner=new_class,
         type='exam',
-        status='created',
         question_source='previous_exam',
         source='admin_generated',
         time_limit=8100,
@@ -64,8 +63,8 @@ def create_class(request):
         if question.category not in selected_categories:
             selected_categories.append(question.category)
 
-    exam.selected_categories.set(selected_categories)
-    exam.questions.set(questions)
+    assessment.selected_categories.set(selected_categories)
+    assessment.questions.set(questions)
 
     return Response(
         {"message": "Class created successfully", "class_id": new_class.id, "class_code": new_class.class_code},

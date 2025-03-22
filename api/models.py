@@ -74,12 +74,6 @@ class Assessment(models.Model):
         ('quiz', 'Quiz')
     ]
 
-    STATUS_CHOICES = [
-        ('created', 'Created'),
-        ('in_progress', 'In Progress'),
-        ('completed', 'Completed'),
-    ]
-
     SOURCE_CHOICES = [
         ('teacher_generated', 'Teacher Generated'),
         ('student_initiated', 'Student Initiated'),
@@ -107,9 +101,7 @@ class Assessment(models.Model):
     taken_at = models.DateTimeField(auto_now=True)
     time_limit = models.IntegerField(default=0)
     deadline = models.DateTimeField(null=True, blank=True)
-
     is_initial = models.BooleanField(default=False)
-    status = models.CharField(max_length=50, choices=STATUS_CHOICES)
 
     source = models.CharField(max_length=50, choices=SOURCE_CHOICES, default='admin_generated')
     question_source = models.CharField(max_length=50, choices=QUESTION_SOURCE_CHOICES, default='previous_exam')
