@@ -246,18 +246,10 @@ def get_all_questions(request):
     if teacher.role != 'teacher':
         return Response({"error": "Only teachers can access student data"}, status=status.HTTP_403_FORBIDDEN)
 
-    questions = Question.objects.all()
+    # Use select_related to minimize queries (joins category to Question)
+    questions = Question.objects.select_related('category').values('id', 'question_text', 'category__name')
 
-    response_data = []
-    for question in questions:
-        question_data = {
-            'question_id': question.id,
-            'question_text': question.question_text,
-            'category_name': question.category.name,
-        }
-        response_data.append(question_data)
-
-    return Response(response_data, status=status.HTTP_200_OK)
+    return Response(list(questions), status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])

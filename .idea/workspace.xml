@@ -4,9 +4,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d83e15d4-b2c8-4a76-9aca-4b58469163cd" name="Changes" comment="fix: Separate getting of assessment results and assessment data">
+    <list default="true" id="d83e15d4-b2c8-4a76-9aca-4b58469163cd" name="Changes" comment="feat:">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/api/models.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/models.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/api/urls.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/urls.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/api/views/student_views.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/views/student_views.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/api/views/teacher_views.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/views/teacher_views.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -138,15 +140,9 @@
       <workItem from="1742320942475" duration="13217000" />
       <workItem from="1742387674871" duration="10366000" />
       <workItem from="1742582035879" duration="2018000" />
-      <workItem from="1742642860504" duration="20339000" />
-    </task>
-    <task id="LOCAL-00004" summary="feat: Add endpoints for taking exams, submitting scores, and fetching results">
-      <option name="closed" value="true" />
-      <created>1733761674087</created>
-      <option name="number" value="00004" />
-      <option name="presentableId" value="LOCAL-00004" />
-      <option name="project" value="LOCAL" />
-      <updated>1733761674087</updated>
+      <workItem from="1742642860504" duration="23564000" />
+      <workItem from="1742723262015" duration="91000" />
+      <workItem from="1742733704119" duration="400000" />
     </task>
     <task id="LOCAL-00005" summary="chore: Deploy backend on Railway&#10;&#10;- Ensured the app is accessible via the domain.">
       <option name="closed" value="true" />
@@ -532,7 +528,15 @@
       <option name="project" value="LOCAL" />
       <updated>1742674711119</updated>
     </task>
-    <option name="localTasksCounter" value="53" />
+    <task id="LOCAL-00053" summary="feat: Edit Quizzes Data">
+      <option name="closed" value="true" />
+      <created>1742675837013</created>
+      <option name="number" value="00053" />
+      <option name="presentableId" value="LOCAL-00053" />
+      <option name="project" value="LOCAL" />
+      <updated>1742675837013</updated>
+    </task>
+    <option name="localTasksCounter" value="54" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -559,7 +563,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="fix: Updated processes" />
     <MESSAGE value="feat: Add Student History" />
     <MESSAGE value="feat: Added quiz urls" />
     <MESSAGE value="feat: Fix class codes" />
@@ -584,6 +587,7 @@
     <MESSAGE value="fix: Added more error handling" />
     <MESSAGE value="fix: Prevent Submission of Assessment after deadline" />
     <MESSAGE value="fix: Separate getting of assessment results and assessment data" />
-    <option name="LAST_COMMIT_MESSAGE" value="fix: Separate getting of assessment results and assessment data" />
+    <MESSAGE value="feat: Edit Quizzes Data" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: Edit Quizzes Data" />
   </component>
 </project>

@@ -45,11 +45,11 @@ urlpatterns = [
 
     path('student/quiz/<assessment_id>', student_views.get_exam_results, name='get_quiz_results'),
 
-    path('student/quiz/take-lesson-quiz', student_views.take_lesson_quiz, name='take_lesson_quiz'),
-
     path('student/class/assessments', student_views.get_class_assessments, name='get_class_quizzes'),
 
-    path('student/quiz/<quiz_id>', student_views.get_exam_results, name='get_quiz_results'),
+    path('student/quiz/<int:quiz_id>', student_views.get_exam_results, name='get_quiz_results'),
+
+    path('student/take-lesson-quiz', student_views.take_lesson_quiz, name='take_lesson_quiz'),
 
 
 

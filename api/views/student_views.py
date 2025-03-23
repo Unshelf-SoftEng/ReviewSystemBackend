@@ -557,7 +557,7 @@ def create_student_quiz(request):
     return Response(quiz_data, status=status.HTTP_200_OK)
 
 
-@api_view(['GET'])
+@api_view(['POST'])
 def take_lesson_quiz(request):
     supabase_uid = get_user_id_from_token(request)
 
@@ -575,16 +575,16 @@ def take_lesson_quiz(request):
     data = request.data
 
     lesson_name = data.get('lesson')
-
-    lesson = Lesson.objects.get(lesson_name=lesson_name)
-    category = Category.objects.get(name=lesson_name)
-    selected_categories = [category.id]
     no_of_questions = data.get('no_of_questions')
 
-    all_questions = Question.objects.filter(category_id__in=selected_categories)
+    lesson = get_object_or_404(Lesson, lesson_name=lesson_name)
+    lesson_category = get_object_or_404(Category, name=lesson_name)
 
-    if all_questions.count() < no_of_questions:
-        return Response({'error': 'No questions available to generate an exam.'}, status=status.HTTP_404_NOT_FOUND)
+    all_questions = list(Question.objects.filter(category_id=lesson_category.id))
+
+    if len(all_questions) < no_of_questions:
+        return Response({'error': 'Not enough questions available to generate an exam.'},
+                        status=status.HTTP_404_NOT_FOUND)
 
     selected_questions = random.sample(list(all_questions), no_of_questions)
 
@@ -596,9 +596,8 @@ def take_lesson_quiz(request):
         source='lesson',
     )
 
-    lesson_quiz.selected_categories.set(selected_categories)
+    lesson_quiz.selected_categories.set([lesson_category.id])
     lesson_quiz.questions.set(selected_questions)
-    lesson_quiz.save()
 
     # Format the questions and answers to send back to the frontend
     quiz_data = {
@@ -614,7 +613,7 @@ def take_lesson_quiz(request):
         ]
     }
 
-    return Response(quiz_data, status=status.HTTP_200_OK)
+    return Response(quiz_data, status=status.HTTP_201_CREATED)
 
 
 @api_view(['GET'])
