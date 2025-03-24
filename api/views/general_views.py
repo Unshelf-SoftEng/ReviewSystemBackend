@@ -2,8 +2,8 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from api.utils.supabase_client import get_supabase_client
-from api.models import User, Lesson, Chapter, LessonProgress, Category, UserAbility
-from django.shortcuts import get_object_or_404
+from api.models import User, Lesson, Category, UserAbility
+from api.decorators import auth_required
 
 
 @api_view(['POST'])
@@ -54,113 +54,103 @@ def register_user(request):
                 return Response({'error': 'Email already registered'}, status=status.HTTP_400_BAD_REQUEST)
             return Response({'error': f'Error: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
+
 @api_view(['POST'])
 def login_user(request):
-    if request.method == 'POST':
-        # Parse data from the request
-        data = request.data  # Automatically parses JSON into a dictionary
-        email = data.get('email')
-        password = data.get('password')
+    data = request.data  # Automatically parses JSON into a dictionary
+    email = data.get('email')
+    password = data.get('password')
 
-        supabase = get_supabase_client()
+    supabase = get_supabase_client()
 
-        try:
-            # Authenticate user with Supabase
-            auth_response = supabase.auth.sign_in_with_password({
-                'email': email,
-                'password': password
-            })
+    try:
+        # Authenticate user with Supabase
+        auth_response = supabase.auth.sign_in_with_password({
+            'email': email,
+            'password': password
+        })
 
-            user = User.objects.get(supabase_user_id=auth_response.user.id)
-            role = user.role
-            first_name = user.first_name
-            last_name = user.last_name
+        user = User.objects.get(supabase_user_id=auth_response.user.id)
+        role = user.role
+        first_name = user.first_name
+        last_name = user.last_name
 
-            
-            # Return success response with role and user information
-            return Response({
-                'message': 'Login successful',
-                'jwt_token': auth_response.session.access_token,
-                'refresh_token': auth_response.session.refresh_token,
-                'role': role,
-                'first_name': first_name,
-                'last_name': last_name
-            }, status=status.HTTP_200_OK)
+        # Create response
+        response = Response({
+            'message': 'Login successful',
+            'role': role,
+            'first_name': first_name,
+            'last_name': last_name
+        }, status=status.HTTP_200_OK)
 
-        except Exception as e:
+        # Set cookies for authentication (HttpOnly for security)
+        response.set_cookie(
+            key='jwt_token',
+            value=auth_response.session.access_token,
+            httponly=True,  # Prevent JavaScript access
+            secure=False,  # Ensure HTTPS only (set False for local dev)
+            samesite='Lax'
+        )
 
-            if "invalid login credentials" in str(e).lower():
-                return Response({'error': 'Email or Password is incorrect'}, status=status.HTTP_400_BAD_REQUEST)
+        response.set_cookie(
+            key='refresh_token',
+            value=auth_response.session.refresh_token,
+            httponly=True,
+            secure=True,
+            samesite='Lax'
+        )
 
-            return Response({'error': f'Error: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+        return response
+
+    except Exception as e:
+        if "invalid login credentials" in str(e).lower():
+            return Response({'error': 'Email or Password is incorrect'}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({'error': f'Error: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['POST'])
 def refresh_token(request):
-    # Retrieve the refresh_token from the frontend request
+    refresh_token = request.COOKIES.get('refresh_token')
 
-    ref_token = request.data.get('refresh_token')
+    if not refresh_token:
+        return Response({'error': 'Refresh token missing'}, status=status.HTTP_401_UNAUTHORIZED)
 
-    if not ref_token:
-        return Response({'error': 'Refresh token is required'}, status=status.HTTP_400_BAD_REQUEST)
-
-    # Get the Supabase client
     supabase = get_supabase_client()
 
     try:
-        # Use the Supabase client to refresh the token
-        auth_response = supabase.auth.refresh_session(ref_token)
+        # Exchange refresh token for a new access token
+        new_session = supabase.auth.refresh_session(refresh_token)
 
-        if auth_response:
-            # Extract new access and refresh tokens
-            new_access_token = auth_response.session.access_token
+        response = Response({'message': 'Token refreshed'}, status=status.HTTP_200_OK)
+        response.set_cookie(
+            key='jwt_token',
+            value=new_session.session.access_token,
+            httponly=True,
+            secure=True,
+            samesite='Lax'
+        )
 
-            return Response({
-                'jwt_token': new_access_token,
-                'refresh_token': auth_response.session.refresh_token,
-            }, status=status.HTTP_200_OK)
-        else:
-            return Response({'error': 'Unable to refresh token'}, status=status.HTTP_400_BAD_REQUEST)
+        return response
 
     except Exception as e:
-        return Response({'error': f'Error: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'error': 'Invalid or expired refresh token'}, status=status.HTTP_401_UNAUTHORIZED)
 
 
 @api_view(['POST'])
 def logout_user(request):
-    """Logs out the user by revoking their session token."""
-    token = request.headers.get('Authorization')
+    response = Response({'message': 'Logout successful'}, status=status.HTTP_200_OK)
 
-    if not token:
-        return Response({'error': 'Authorization token required'}, status=status.HTTP_401_UNAUTHORIZED)
+    # Remove cookies
+    response.delete_cookie('jwt_token')
+    response.delete_cookie('refresh_token')
 
-    token = token.split("Bearer ")[-1]
-    supabase = get_supabase_client()
+    return response
 
-    try:
-        supabase.auth.sign_out()
-        return Response({'message': 'Logout successful'}, status=status.HTTP_200_OK)
-    except Exception as e:
-        return Response({'error': f'Error: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
-
-
-def get_user_id_from_token(request):
-    """Helper function to extract the user ID from the Supabase JWT token."""
-    token = request.headers.get('Authorization')
-    if not token:
-        return None
-    token = token.split("Bearer ")[-1]
-
-    try:
-        response = get_supabase_client().auth.get_user(jwt=token)
-        return response.user.id
-    except Exception as e:
-        print(str(e))
-        return None
-
-
+@api_view(['POST'])
+@auth_required()
 def reset_password(request):
-    data = request.data  # Automatically parses JSON into a dictionary
+    data = request.data
     email = data.get('email')
     get_supabase_client().reset_password_email(
         email=email,
@@ -169,17 +159,9 @@ def reset_password(request):
 
 
 @api_view(['POST'])
+@auth_required()
 def update_password(request):
-    supabase_uid = get_user_id_from_token(request)
-
-    if not supabase_uid:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    try:
-        user = User.objects.get(supabase_user_id=supabase_uid)
-    except User.DoesNotExist:
-        return Response({'error': 'User does not exist.'}, status=status.HTTP_404_NOT_FOUND)
-
+    user: User = request.user
     data = request.data
     supabase = get_supabase_client()
     current_password = data.get('current_password')
@@ -203,19 +185,10 @@ def update_password(request):
     return Response(return_data, status=status.HTTP_200_OK)
 
 
-
-
 @api_view(['GET'])
+@auth_required()
 def get_user_details(request):
-    supabase_uid = get_user_id_from_token(request)
-
-    if not supabase_uid:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    try:
-        user = User.objects.get(supabase_user_id=supabase_uid)
-    except User.DoesNotExist:
-        return Response({'error': 'User does not exist.'}, status=status.HTTP_404_NOT_FOUND)
+    user: User = request.user
 
     user_data = {
         'first_name': user.first_name,
@@ -225,17 +198,3 @@ def get_user_details(request):
     }
 
     return Response(user_data, status=status.HTTP_200_OK)
-
-
-@api_view(['GET'])
-def get_lessons_overall(request):
-    user_id = get_user_id_from_token(request)
-
-    if not user_id:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    lessons = Lesson.objects.all().values('id', 'lesson_name')
-
-    return Response(lessons, status=status.HTTP_200_OK)
-
-

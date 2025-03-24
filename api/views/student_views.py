@@ -7,13 +7,12 @@ from ..models import User, Question, Assessment, Answer, AssessmentResult, UserA
     LessonProgress, Class, AssessmentProgress, Chapter
 from collections import defaultdict
 from ..ai.estimate_student_ability import estimate_ability_irt
-from api.views.general_views import get_user_id_from_token
 from django.shortcuts import get_object_or_404
-from ..decorators import role_required
+from ..decorators import auth_required
 
 
 @api_view(['GET'])
-@role_required("student")
+@auth_required("student")
 def get_class(request):
     user: User = request.user
     # Get the classes the student is enrolled in
@@ -75,7 +74,7 @@ def get_class(request):
 
 
 @api_view(['POST'])
-@role_required("student")
+@auth_required("student")
 def join_class(request):
     user: User = request.user
 
@@ -100,7 +99,7 @@ def join_class(request):
 
 
 @api_view(['GET'])
-@role_required("student")
+@auth_required("student")
 def get_initial_exam(request):
     user: User = request.user
 
@@ -124,7 +123,7 @@ def get_initial_exam(request):
 
 
 @api_view(['GET'])
-@role_required("student")
+@auth_required("student")
 def initial_exam_taken(request):
     user: User = request.user
 
@@ -140,7 +139,7 @@ def initial_exam_taken(request):
 
 
 @api_view(['GET'])
-@role_required("student")
+@auth_required("student")
 def take_initial_exam(request):
     user: User = request.user
 
@@ -183,7 +182,7 @@ def take_initial_exam(request):
 
 
 @api_view(['GET'])
-@role_required("student")
+@auth_required("student")
 def take_exam(request):
     user: User = request.user
 
@@ -235,7 +234,7 @@ def take_exam(request):
 
 
 @api_view(['GET'])
-@role_required("student")
+@auth_required("student")
 def check_time_limit(request, assessment_id):
     user: User = request.user
     progress = get_object_or_404(AssessmentProgress, user=user, assessment_id=assessment_id)
@@ -252,7 +251,7 @@ def check_time_limit(request, assessment_id):
 
 
 @api_view(['POST'])
-@role_required("student")
+@auth_required("student")
 def submit_assessment(request, assessment_id):
     user: User = request.user
 
@@ -329,7 +328,7 @@ def submit_assessment(request, assessment_id):
 
 
 @api_view(['GET'])
-@role_required("student")
+@auth_required("student")
 def get_exam_results(request, assessment_id):
     user: User = request.user
 
@@ -391,7 +390,7 @@ def get_exam_results(request, assessment_id):
 
 
 @api_view(['GET'])
-@role_required("student")
+@auth_required("student")
 def get_ability(request):
     user: User = request.user
 
@@ -409,7 +408,7 @@ def get_ability(request):
 
 
 @api_view(['POST'])
-@role_required("student")
+@auth_required("student")
 def create_student_quiz(request):
     user: User = request.user
     print(request.data)
@@ -468,7 +467,7 @@ def create_student_quiz(request):
 
 
 @api_view(['POST'])
-@role_required("student")
+@auth_required("student")
 def take_lesson_quiz(request):
     user: User = request.user
     data = request.data
@@ -516,7 +515,7 @@ def take_lesson_quiz(request):
 
 
 @api_view(['GET'])
-@role_required("student")
+@auth_required("student")
 def get_class_assessments(request):
     user: User = request.user
 
@@ -554,7 +553,7 @@ def get_class_assessments(request):
 
 
 @api_view(['GET'])
-@role_required("student")
+@auth_required("student")
 def get_history(request):
     user: User = request.user
     assessment_results = AssessmentResult.objects.filter(user_id=user.id)
@@ -599,7 +598,7 @@ def get_history(request):
 
 
 @api_view(['GET'])
-@role_required("student")
+@auth_required("student")
 def get_lessons(request):
     user: User = request.user
 
@@ -628,9 +627,13 @@ def get_lessons(request):
 
 
 @api_view(['GET'])
-@role_required("student")
+@auth_required("student")
 def get_lesson(request, lesson_id):
     user: User = request.user
+
+    if user.enrolled_class is None:
+        return Response({'error': 'You are not enrolled.'}, status=status.HTTP_400_BAD_REQUEST)
+
     lesson = get_object_or_404(Lesson, id=lesson_id)
 
     if lesson.is_locked:
@@ -708,14 +711,14 @@ def get_lesson(request, lesson_id):
 
 
 @api_view(['GET'])
-@role_required("student")
+@auth_required("student")
 def get_chapter(request, lesson_id, chapter_id):
     user: User = request.user
     return Response({'error': 'Chapter does not exist.'}, status=status.HTTP_404_NOT_FOUND)
 
 
 @api_view(['POST'])
-@role_required("student")
+@auth_required("student")
 def update_lesson_progress(request, lesson_id):
     user: User = request.user
     lesson = get_object_or_404(Lesson, id=lesson_id)

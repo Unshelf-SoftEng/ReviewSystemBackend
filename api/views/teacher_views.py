@@ -5,12 +5,11 @@ from rest_framework.response import Response
 from ..models import User, Class, UserAbility, Assessment, AssessmentResult, Question, AssessmentProgress, Lesson, Chapter
 from django.shortcuts import get_object_or_404
 from django.utils.dateparse import parse_datetime
-from api.views.general_views import get_user_id_from_token
-from api.decorators import role_required
+from api.decorators import auth_required
 
 
 @api_view(['POST'])
-@role_required("teacher")
+@auth_required("teacher")
 def create_class(request):
     user: User = request.user
     class_name = request.data.get('class_name')
@@ -64,7 +63,7 @@ def create_class(request):
 
 
 @api_view(['GET'])
-@role_required("teacher")
+@auth_required("teacher")
 def get_classes(request):
     user: User = request.user
     classes = Class.objects.filter(teacher=user)
@@ -84,7 +83,7 @@ def get_classes(request):
 
 
 @api_view(['GET'])
-@role_required("teacher")
+@auth_required("teacher")
 def get_class(request, class_id):
     teacher_class = Class.objects.get(id=class_id)
 
@@ -112,7 +111,7 @@ def get_class(request, class_id):
 
 
 @api_view(['GET'])
-@role_required("teacher")
+@auth_required("teacher")
 def view_initial_exam(request, class_id):
     print("View Initial Exam was called")
     class_owner = Class.objects.get(id=class_id)
@@ -129,7 +128,7 @@ def view_initial_exam(request, class_id):
 
 
 @api_view(['POST'])
-@role_required("teacher")
+@auth_required("teacher")
 def open_initial_exam(request, class_id):
     deadline = request.data['deadline']
     class_owner = Class.objects.get(id=class_id)
@@ -141,7 +140,7 @@ def open_initial_exam(request, class_id):
 
 
 @api_view(['GET'])
-@role_required("teacher")
+@auth_required("teacher")
 def get_student_data(request, student_id):
 
     student = get_object_or_404(User, id=student_id)
@@ -178,7 +177,7 @@ def get_student_data(request, student_id):
 
 
 @api_view(['GET'])
-@role_required("teacher")
+@auth_required("teacher")
 def get_all_questions(request):
     questions = Question.objects.select_related('category').values('id', 'question_text', 'category__name')
 
@@ -186,7 +185,7 @@ def get_all_questions(request):
 
 
 @api_view(['POST'])
-@role_required("teacher")
+@auth_required("teacher")
 def create_quiz(request, class_id):
     print("Create Quiz was Called")
 
@@ -229,7 +228,7 @@ def create_quiz(request, class_id):
 
 
 @api_view(['GET'])
-@role_required("teacher")
+@auth_required("teacher")
 def get_class_assessments(request, class_id):
     print("Get All Quizzes was called")
     class_obj = Class.objects.get(id=class_id)
@@ -256,7 +255,7 @@ def get_class_assessments(request, class_id):
 
 
 @api_view(['GET'])
-@role_required("teacher")
+@auth_required("teacher")
 def get_assessment_data(request, assessment_id):
 
     assessment = get_object_or_404(Assessment, id=assessment_id)
@@ -287,7 +286,7 @@ def get_assessment_data(request, assessment_id):
 
 
 @api_view(['GET'])
-@role_required("teacher")
+@auth_required("teacher")
 def get_assessment_results(request, assessment_id):
     assessment = get_object_or_404(Assessment, id=assessment_id)
     students = User.objects.filter(enrolled_class=assessment.class_owner)
@@ -323,7 +322,7 @@ def get_assessment_results(request, assessment_id):
 
 
 @api_view(['POST'])
-@role_required("teacher")
+@auth_required("teacher")
 def update_assessment(request, assessment_id):
     questions = request.data.get('questions')
     assessment = get_object_or_404(Assessment, id=assessment_id)
@@ -344,7 +343,7 @@ def update_assessment(request, assessment_id):
 
 
 @api_view(['POST'])
-@role_required("teacher")
+@auth_required("teacher")
 def delete_assessment(request, quiz_id):
     assessment = get_object_or_404(Assessment, id=quiz_id)
 
@@ -363,7 +362,7 @@ def delete_assessment(request, quiz_id):
 
 
 @api_view(['GET'])
-@role_required("teacher")
+@auth_required("teacher")
 def get_lesson_teacher(request, lesson_id):
     user: User = request.user
     lesson = get_object_or_404(Lesson, id=lesson_id)
