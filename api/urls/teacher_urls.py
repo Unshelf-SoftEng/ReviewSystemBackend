@@ -14,4 +14,11 @@ urlpatterns = [
     path('assessment/<int:assessment_id>/update', teacher_views.update_assessment, name='update_assessment'),
     path('assessment/<int:assessment_id>', teacher_views.get_assessment_data, name='get_assessment_data'),
     path('class/<int:class_id>', teacher_views.get_class, name='get_teacher_class'),
+    path('lessons/', teacher_views.get_lessons, name='get_lessons'),
+    path('lesson/<int:lesson_id>/chapter/<int:chapter_id>', teacher_views.get_chapter, name='get_lesson'),
+    path('lesson/<int:lesson_id>', teacher_views.get_lesson, name='get_lesson'),
+
+    path('class/<int:class_id>/lesson/<int:lesson_id>/results', teacher_views.get_lesson_quiz, name='get_lesson_quiz'),
+
+    path('class/<int:class_id>/chapter/<int:chapter_id>/results', teacher_views.get_chapter_quiz, name='get_chapter_quiz'),
 ]

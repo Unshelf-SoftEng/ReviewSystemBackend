@@ -469,7 +469,7 @@ def take_lesson_quiz(request):
     lesson_name = data.get('lesson')
     no_of_questions = data.get('no_of_questions')
 
-    lesson = get_object_or_404(Lesson, lesson_name=lesson_name)
+    lesson = get_object_or_404(Lesson, name=lesson_name)
     lesson_category = get_object_or_404(Category, name=lesson_name)
 
     all_questions = list(Question.objects.filter(category_id=lesson_category.id))

@@ -2,10 +2,12 @@ from pyasn1_modules.rfc2315 import data
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from ..models import User, Class, UserAbility, Assessment, AssessmentResult, Question, AssessmentProgress, Lesson, Chapter
+from ..models import User, Class, UserAbility, Assessment, AssessmentResult, Question, AssessmentProgress, Lesson, \
+    Chapter
 from django.shortcuts import get_object_or_404
 from django.utils.dateparse import parse_datetime
 from api.decorators import auth_required
+from django.db.models import Avg
 
 
 @api_view(['POST'])
@@ -142,7 +144,6 @@ def open_initial_exam(request, class_id):
 @api_view(['GET'])
 @auth_required("teacher")
 def get_student_data(request, student_id):
-
     student = get_object_or_404(User, id=student_id)
 
     if student.role != 'student':
@@ -257,7 +258,6 @@ def get_class_assessments(request, class_id):
 @api_view(['GET'])
 @auth_required("teacher")
 def get_assessment_data(request, assessment_id):
-
     assessment = get_object_or_404(Assessment, id=assessment_id)
 
     questions_data = []
@@ -363,8 +363,25 @@ def delete_assessment(request, quiz_id):
 
 @api_view(['GET'])
 @auth_required("teacher")
-def get_lesson_teacher(request, lesson_id):
+def get_lessons(request):
+    lessons = Lesson.objects.all()
+
+    lessons_data = []
+
+    for lesson in lessons:
+        lessons_data.append({
+            "id": lesson.id,
+            "name": lesson.name,
+        })
+
+    return Response(lessons_data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@auth_required("teacher")
+def get_lesson(request, lesson_id):
     user: User = request.user
+
     lesson = get_object_or_404(Lesson, id=lesson_id)
 
     if lesson.is_locked:
@@ -373,39 +390,41 @@ def get_lesson_teacher(request, lesson_id):
             status=status.HTTP_403_FORBIDDEN
         )
 
-    chapters = lesson.chapters.all().order_by("chapter_number")
-
+    chapters = lesson.chapters.all().order_by("number")
     lesson_structure = []
 
     for chapter in chapters:
+
         chapter_data = {
             "id": chapter.id,
-            "chapter_name": chapter.chapter_name,
-            "chapter_number": chapter.chapter_number,
+            "chapter_number": chapter.number,
+            "chapter_name": chapter.name,
             "is_main_chapter": chapter.is_main_chapter,
             "is_locked": chapter.is_locked,
-            "sections": []
         }
 
-        for section in chapter.sections.all():
-            chapter_data["sections"].append({
-                "id": section.id,
-                "title": section.name,
-                "part_number": section.number,
-            })
+        if not chapter.is_locked:
+            chapter_data["structure"] = []
+
+            for section in chapter.sections.all():
+                chapter_data["structure"].append({
+                    "section_id": section.id,
+                    "section_number": section.number,
+                    "section_name": section.name,
+                })
+
+            if chapter.is_main_chapter:
+                chapter_data["structure"].append({
+                    "type": "quiz",
+                    "title": f"Quiz for {chapter.name}",
+                })
 
         lesson_structure.append(chapter_data)
-        # is_quiz_taken = AssessmentResult.objects.filter(assessment=lesson, user=user).exists()
-        if chapter.is_main_chapter:
-            lesson_structure.append({
-                "type": "quiz",
-                "title": f"Quiz for {chapter.chapter_name}",
-            })
 
-    # Add the final lesson quiz at the end
     lesson_structure.append({
         "type": "quiz",
         "title": "Final Lesson Quiz",
+        "completed": AssessmentResult.objects.filter(assessment__lesson=lesson).exists()
     })
 
     lesson_data = {
@@ -415,3 +434,116 @@ def get_lesson_teacher(request, lesson_id):
     }
 
     return Response(lesson_data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@auth_required("teacher")
+def get_chapter(request, lesson_id, chapter_id):
+    chapter = get_object_or_404(Chapter, id=chapter_id)
+
+    if chapter.is_locked:
+        return Response(
+            {'error': 'Lesson is currently locked. Please wait till the teacher opens it'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    section_data = []
+
+    for section in chapter.sections.all():
+        section_data.append({
+            "id": section.id,
+            "number": section.number,
+            "title": section.name,
+            "content": section.content,
+        })
+
+    chapter_data = {
+        "id": chapter.id,
+        "chapter_number": chapter.number,
+        "chapter_name": chapter.name,
+        "sections": section_data
+    }
+
+    return Response(chapter_data, status=status.HTTP_404_NOT_FOUND)
+
+@api_view(['GET'])
+@auth_required("teacher")
+def get_lesson_quiz(request, class_id, lesson_id):
+    students = User.objects.filter(enrolled_class__id=class_id).all()
+    lesson = get_object_or_404(Lesson, id=lesson_id)
+    students_data = []
+    total_score = 0
+
+    for student in students:
+
+        assessment = Assessment.objects.filter(lesson=lesson, created_by=student).first()
+        assessment_result = AssessmentResult.objects.filter(assessment=assessment, user=student).last()
+
+        if assessment_result:
+            score_pct = (assessment_result.score / assessment_result.assessment.questions.count()) * 100
+            students_data.append({
+                "student_id": student.id,
+                "student_name": student.full_name,
+                "taken": True,
+                "score_percentage": round(score_pct, 2)
+            })
+            total_score += score_pct
+        else:
+            students_data.append({
+                "student_id": student.id,
+                "student_name": student.full_name,
+                "taken": False,
+            })
+
+    average_score = total_score / students.count() if students.exists() else 0
+
+    return Response({
+        "lesson_id": lesson_id,
+        "lesson_name": lesson.name,
+        "average_percentage": average_score,
+        "students_data": students_data,
+    }, status=status.HTTP_200_OK)
+
+
+
+
+
+@api_view(['GET'])
+@auth_required("teacher")
+def get_chapter_quiz(request, class_id, chapter_id):
+    students = User.objects.filter(enrolled_class__id=class_id).all()
+    chapter = get_object_or_404(Chapter, id=chapter_id)
+    students_data = []
+    total_score = 0
+
+    for student in students:
+
+        assessment = Assessment.objects.filter(chapter=chapter, created_by=student).first()
+        assessment_result = AssessmentResult.objects.filter(assessment=assessment, user=student).last()
+
+        if assessment_result.exists():
+            score_pct = (assessment_result.score / assessment_result.assessment.questions.count()) * 100
+
+            students_data.append({
+                "student_id": student.id,
+                "student_name": student.full_name,
+                "taken": True,
+                "score_percentage": round(score_pct, 2)
+            })
+            total_score += score_pct
+        else:
+            students_data.append({
+                "student_id": student.id,
+                "student_name": student.full_name,
+                "taken": False,
+            })
+
+    average_score = total_score / students.count() if students.exists() else 0
+
+    return Response({
+        "chapter_id": chapter_id,
+        "chapter_name": chapter.name,
+        "lesson_name": chapter.lesson.name,
+        "average_percentage": average_score,
+        "students_data": students_data,
+    }, status=status.HTTP_200_OK)
