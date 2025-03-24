@@ -1,7 +1,7 @@
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from api.models import Question, Category, Lesson, Chapter
+from api.models import Question, Category, Lesson, Chapter, Section
 import json
 
 CATEGORY_MAPPING = {
@@ -101,22 +101,58 @@ def upload_questions_from_sheet(spreadsheet_id, range_name):
                 )
 
 
-def upload_lessons_from_sheet(spreadsheet_id, range_name):
-    sheet_data = get_sheet_data(spreadsheet_id, range_name)
-    if sheet_data:
-        for row in sheet_data[1:]:
+def upload_lessons_from_sheet(lesson_spreadsheet_id, lesson_range, chapter_spreadsheet_id, chapter_range,
+                              section_spreadsheet_id, section_range):
+    lesson_data = get_sheet_data(lesson_spreadsheet_id, lesson_range)
+    chapter_data = get_sheet_data(chapter_spreadsheet_id, chapter_range)
+    section_data = get_sheet_data(section_spreadsheet_id, section_range)
 
-            if Lesson.objects.filter(lesson_name=row[0]).exists():
-                lesson = Lesson.objects.get(lesson_name=row[0])
-            else:
-                lesson = Lesson.objects.create(lesson_name=row[0])
+    if not lesson_data or not chapter_data or not section_data:
+        print("Missing data from one or more sheets.")
+        return
 
+    lessons = {}
+    chapters = {}
+
+    for row in lesson_data[1:]:  # Skip header row
+        lesson_id, lesson_name, is_locked = row
+        lesson, created = Lesson.objects.update_or_create(
+            id=lesson_id,
+            defaults={
+                'name': lesson_name,
+                'is_locked': bool(int(is_locked))
+            }
+        )
+        lessons[lesson_id] = lesson
+
+    for row in chapter_data[1:]:  # Skip header row
+        chapter_id, lesson_id, chapter_number, chapter_name, chapter_is_locked, is_main_chapter = row
+        lesson = lessons.get(lesson_id)
+        if lesson:
             chapter, created = Chapter.objects.update_or_create(
+                id=chapter_id,
                 lesson=lesson,
-                chapter_name=row[2],
-                chapter_number=row[1],
-                content=row[3]
+                defaults={
+                    'name': chapter_name,
+                    'number': chapter_number,
+                    'is_locked': bool(int(chapter_is_locked)),
+                    'is_main_chapter': bool(int(is_main_chapter))
+                }
+            )
+            chapters[chapter_id] = chapter
+
+    for row in section_data[1:]:
+        section_id, chapter_id, section_number, section_name, content = row
+        chapter = chapters.get(chapter_id)
+        if chapter:
+            section, updated = Section.objects.update_or_create(
+                chapter=chapter,
+                number=section_number,
+                defaults={
+                    'name': section_name,
+                    'content': content
+                }
             )
 
-            action = "Updated" if not created else "Uploaded"
-            print(f"{action}: {lesson.lesson_name} - {chapter.chapter_name}")
+        print(
+            f"Uploaded: {chapter.lesson.name} -> {chapter.number}. {chapter.name} -> Section {section_number}: {section_name}")
