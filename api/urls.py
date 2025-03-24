@@ -51,15 +51,9 @@ urlpatterns = [
 
     path('student/take-lesson-quiz', student_views.take_lesson_quiz, name='take_lesson_quiz'),
 
+    path('student/lessons', student_views.get_lessons, name='get_lessons'),
 
-
-
-    #Lessons
-    path('lessons', general_views.get_lessons_overall, name='get_lessons_overall'),
-
-    path('lessons/<lesson_id>/update_progress', general_views.update_lesson_progress, name='update_lesson_progress'),
-
-    path('lessons/<lesson_id>', general_views.get_lesson, name='get_lesson'),
+    path('student/lessons/<int:lesson_id>', student_views.get_lesson, name='get_lesson'),
 
 
 

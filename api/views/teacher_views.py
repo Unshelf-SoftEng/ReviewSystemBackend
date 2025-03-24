@@ -2,7 +2,7 @@ from pyasn1_modules.rfc2315 import data
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from ..models import User, Class, UserAbility, Assessment, AssessmentResult, Question, AssessmentProgress
+from ..models import User, Class, UserAbility, Assessment, AssessmentResult, Question, AssessmentProgress, Lesson, Chapter
 from django.shortcuts import get_object_or_404
 from django.utils.dateparse import parse_datetime
 from api.views.general_views import get_user_id_from_token
@@ -480,3 +480,63 @@ def delete_assessment(request, quiz_id):
 
     assessment.delete()
     return Response({"success": "Assessment deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['GET'])
+def get_lesson_teacher(request, lesson_id):
+    user_id = get_user_id_from_token(request)
+
+    if not user_id:
+        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    user = get_object_or_404(User, supabase_user_id=user_id)
+    lesson = get_object_or_404(Lesson, id=lesson_id)
+
+    if lesson.is_locked:
+        return Response(
+            {'error': 'Lesson is currently locked. Please wait till the teacher opens it'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    chapters = lesson.chapters.all().order_by("chapter_number")
+
+    lesson_structure = []
+
+    for chapter in chapters:
+        chapter_data = {
+            "id": chapter.id,
+            "chapter_name": chapter.chapter_name,
+            "chapter_number": chapter.chapter_number,
+            "is_main_chapter": chapter.is_main_chapter,
+            "is_locked": chapter.is_locked,
+            "sections": []
+        }
+
+        for section in chapter.sections.all():
+            chapter_data["sections"].append({
+                "id": section.id,
+                "title": section.name,
+                "part_number": section.number,
+            })
+
+        lesson_structure.append(chapter_data)
+        # is_quiz_taken = AssessmentResult.objects.filter(assessment=lesson, user=user).exists()
+        if chapter.is_main_chapter:
+            lesson_structure.append({
+                "type": "quiz",
+                "title": f"Quiz for {chapter.chapter_name}",
+            })
+
+    # Add the final lesson quiz at the end
+    lesson_structure.append({
+        "type": "quiz",
+        "title": "Final Lesson Quiz",
+    })
+
+    lesson_data = {
+        "id": lesson.id,
+        "lesson_name": lesson.name,
+        "structure": lesson_structure,
+    }
+
+    return Response(lesson_data, status=status.HTTP_200_OK)

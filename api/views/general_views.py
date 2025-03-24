@@ -45,6 +45,8 @@ def register_user(request):
                 for category in categories:
                     UserAbility.objects.create(user=new_user, category=category, elo_ability=1000, irt_ability=0)
 
+                lessons = Lesson.objects.all()
+
             return Response({'message': 'User registered successfully!'}, status=status.HTTP_201_CREATED)
         except Exception as e:
 
@@ -237,89 +239,3 @@ def get_lessons_overall(request):
     return Response(lessons, status=status.HTTP_200_OK)
 
 
-@api_view(['GET'])
-def get_lesson(request, lesson_id):
-    user_id = get_user_id_from_token(request)
-
-    if not user_id:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    user = get_object_or_404(User, supabase_user_id=user_id)
-    lesson = get_object_or_404(Lesson, id=lesson_id)
-    chapters = lesson.chapters.all().order_by("chapter_number")
-
-    lesson_data = {
-        "id": lesson.id,
-        "lesson_name": lesson.lesson_name,
-        "chapters": [
-            {
-                "id": chapter.id,
-                "chapter_name": chapter.chapter_name,
-                "chapter_number": chapter.chapter_number,
-                "content": chapter.content
-            }
-            for chapter in chapters
-        ]
-    }
-
-    # If the user is a student, add their lesson progress
-    if user.role == "student":
-        lesson_progress, created = LessonProgress.objects.get_or_create(
-            user=user,
-            lesson=lesson,
-            defaults={"progress_percentage": 0.0}  # Default progress if new
-        )
-
-        lesson_data["progress"] = {
-            "current_chapter": lesson_progress.current_chapter.id if lesson_progress.current_chapter else None,
-            "progress_percentage": lesson_progress.progress_percentage
-        }
-
-    return Response(lesson_data, status=status.HTTP_200_OK)
-
-
-@api_view(['POST'])
-def update_lesson_progress(request, lesson_id):
-    user_id = get_user_id_from_token(request)
-
-    if not user_id:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    user = get_object_or_404(User, supabase_user_id=user_id)
-
-    if user.role != "student":
-        return Response({'error': 'Only students can update progress.'}, status=status.HTTP_403_FORBIDDEN)
-
-    lesson = get_object_or_404(Lesson, id=lesson_id)
-    data = request.data
-    chapter_id = data.get("chapter_id")
-
-    if not chapter_id:
-        return Response({'error': 'chapter_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
-
-    chapter = get_object_or_404(Chapter, id=chapter_id, lesson=lesson)
-
-    # Get or create lesson progress
-    lesson_progress, created = LessonProgress.objects.get_or_create(
-        user=user,
-        lesson=lesson,
-        defaults={"progress_percentage": 0.0}
-    )
-
-    # Update progress
-    lesson_progress.current_chapter = chapter
-
-    # Calculate progress percentage
-    total_chapters = lesson.chapters.count()
-    progress_percentage = (chapter.chapter_number / total_chapters) * 100
-    lesson_progress.progress_percentage = progress_percentage
-
-    lesson_progress.save()
-
-    return Response({
-        "message": "Lesson progress updated successfully.",
-        "progress": {
-            "current_chapter": lesson_progress.current_chapter.id,
-            "progress_percentage": lesson_progress.progress_percentage
-        }
-    }, status=status.HTTP_200_OK)

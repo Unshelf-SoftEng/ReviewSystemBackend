@@ -149,35 +149,39 @@ class Class(models.Model):
 
 
 class Lesson(models.Model):
-    lesson_name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255)
     is_locked = models.BooleanField(default=False)
 
     def __str__(self):
-        return self.lesson_name
+        return self.name
+
 
 
 class Chapter(models.Model):
     lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name='chapters')
-    chapter_name = models.CharField(max_length=255)
-    chapter_number = models.PositiveIntegerField()
+    name = models.CharField(max_length=255)
+    number = models.PositiveIntegerField()
     is_main_chapter = models.BooleanField(default=False)
     is_locked = models.BooleanField(default=False)
 
+    class Meta:
+        ordering = ['number']
+
     def __str__(self):
-        return f"{self.lesson.lesson_name} - {self.chapter_number}. {self.chapter_name}"
+        return f"{self.lesson.name} - {self.number}. {self.name}"
 
 
-class Part(models.Model):
+class Section(models.Model):
     chapter = models.ForeignKey(Chapter, on_delete=models.CASCADE, related_name='parts')
-    part_number = models.PositiveIntegerField()
-    title = models.CharField(max_length=255)
+    name = models.CharField(max_length=255)
+    number = models.PositiveIntegerField()
     content = models.TextField()
 
     class Meta:
-        ordering = ['part_number']
+        ordering = ['number']
 
     def __str__(self):
-        return f"{self.chapter} - Part {self.part_number}: {self.title}"
+        return f"{self.chapter} - Section {self.number}: {self.name}"
 
 
 class LessonProgress(models.Model):
@@ -185,41 +189,7 @@ class LessonProgress(models.Model):
     lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name='progress')
     current_chapter = models.ForeignKey(Chapter, on_delete=models.SET_NULL, null=True, blank=True,
                                         related_name='progress')
-    current_part = models.ForeignKey(Part, on_delete=models.SET_NULL, null=True, blank=True, related_name='progress')
+    current_section = models.ForeignKey(Section, on_delete=models.SET_NULL, null=True, blank=True, related_name='progress')
 
     def __str__(self):
-        return f"{self.user.full_name} - {self.lesson.lesson_name} | Chapter: {self.current_chapter} | Part: {self.current_part}"
-
-# class LessonProgress(models.Model):
-#     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='lesson_progress')
-#     lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name='progress')
-#     current_chapter = models.ForeignKey(Chapter, on_delete=models.SET_NULL, null=True, blank=True,
-#                                         related_name='progress')
-#     current_part = models.ForeignKey(Part, on_delete=models.SET_NULL, null=True, blank=True, related_name='progress')
-#     progress_percentage = models.FloatField(default=0.0)
-#
-#     def calculate_progress(self):
-#         """Calculate progress based on the current Part"""
-#         total_parts = Part.objects.filter(chapter__lesson=self.lesson).count()
-#         if self.current_part:
-#             completed_parts = Part.objects.filter(chapter__lesson=self.lesson,
-#                                                   part_number__lte=self.current_part.part_number).count()
-#             self.progress_percentage = (completed_parts / total_parts) * 100 if total_parts > 0 else 0
-#         else:
-#             self.progress_percentage = 0  # No progress if no part is started
-#
-#         self.save()
-#
-#     def advance_part(self):
-#         """Move to the next part and update progress"""
-#         if self.current_part:
-#             next_part = Part.objects.filter(chapter__lesson=self.lesson,
-#                                             part_number__gt=self.current_part.part_number).order_by(
-#                 'part_number').first()
-#             if next_part:
-#                 self.current_part = next_part
-#                 self.save()
-#                 self.calculate_progress()
-#
-#     def __str__(self):
-#         return f"{self.user.full_name} - {self.lesson.lesson_name} Progress: {self.progress_percentage:.2f}%"
+        return f"{self.user.full_name} - {self.lesson.name} | Chapter: {self.current_chapter} | Section: {self.current_section}"
