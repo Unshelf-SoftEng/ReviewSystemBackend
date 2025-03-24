@@ -1,0 +1,11 @@
+from django.urls import path
+from ..views import general_views
+
+urlpatterns = [
+    path('register/', general_views.register_user, name='register_user'),
+    path('login/', general_views.login_user, name='login_user'),
+    path('logout/', general_views.logout_user, name='logout_user'),
+    path('refresh-token/', general_views.refresh_token, name='refresh_token'),
+    path('profile/', general_views.get_user_details, name='get_user_details'),
+    path('update-password/', general_views.update_password, name='update_password'),
+]
