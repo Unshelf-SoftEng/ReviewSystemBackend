@@ -5,7 +5,6 @@ from django.core.exceptions import ObjectDoesNotExist
 from api.utils.supabase_client import get_supabase_client
 from api.models import User
 
-
 def auth_required(*allowed_roles):
     """
     Decorator to authenticate users.
@@ -30,11 +29,14 @@ def auth_required(*allowed_roles):
                 # Token might be expired, try refreshing it
                 if refresh_token:
                     try:
-                        new_session = supabase_client.auth.refresh_session(refresh_token)
-                        new_access_token = new_session.session.access_token
+                        new_session = supabase_client.auth.refresh_session(refresh_token=refresh_token)
+                        if not new_session or not new_session.session:
+                            return Response({'error': 'Token refresh failed. Please log in again.'},
+                                            status=status.HTTP_401_UNAUTHORIZED)
 
-                        # Update the token for the request
-                        user_data = supabase_client.auth.get_user(jwt=new_access_token)
+                        # Extract new access and refresh tokens
+                        new_access_token = new_session.session.access_token
+                        new_refresh_token = new_session.session.refresh_token
 
                         # Create response and update cookies
                         response = view_func(request, *args, **kwargs)
@@ -45,7 +47,15 @@ def auth_required(*allowed_roles):
                             secure=True,
                             samesite='Lax'
                         )
+                        response.set_cookie(
+                            key='refresh_token',
+                            value=new_refresh_token,
+                            httponly=True,
+                            secure=True,
+                            samesite='Lax'
+                        )
                         return response
+
                     except Exception:
                         return Response({'error': 'Invalid or expired refresh token. Please log in again.'},
                                         status=status.HTTP_401_UNAUTHORIZED)

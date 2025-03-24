@@ -75,6 +75,9 @@ def login_user(request):
         first_name = user.first_name
         last_name = user.last_name
 
+        print("Access Token:", auth_response.session.access_token)
+        print("Refresh Token:", auth_response.session.refresh_token)
+
         # Create response
         response = Response({
             'message': 'Login successful',
@@ -88,7 +91,7 @@ def login_user(request):
             key='jwt_token',
             value=auth_response.session.access_token,
             httponly=True,  # Prevent JavaScript access
-            secure=False,  # Ensure HTTPS only (set False for local dev)
+            secure=True,
             samesite='Lax'
         )
 
@@ -110,7 +113,7 @@ def login_user(request):
 
 
 @api_view(['POST'])
-def refresh_token(request):
+def refresh(request):
     refresh_token = request.COOKIES.get('refresh_token')
 
     if not refresh_token:
@@ -119,13 +122,32 @@ def refresh_token(request):
     supabase = get_supabase_client()
 
     try:
-        # Exchange refresh token for a new access token
-        new_session = supabase.auth.refresh_session(refresh_token)
+        session_data = supabase.auth.refresh_session(refresh_token=refresh_token)
+
+        print(session_data)
+
+        if not session_data or not session_data.session:
+            return Response({'error': 'Invalid or expired refresh token'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        # Extract new tokens
+        new_access_token = session_data.session.access_token
+        new_refresh_token = session_data.session.refresh_token  # MUST BE UPDATED
 
         response = Response({'message': 'Token refreshed'}, status=status.HTTP_200_OK)
+
+        # Set new access token
         response.set_cookie(
             key='jwt_token',
-            value=new_session.session.access_token,
+            value=new_access_token,
+            httponly=True,
+            secure=True,
+            samesite='Lax'
+        )
+
+        # Set new refresh token
+        response.set_cookie(
+            key='refresh_token',
+            value=new_refresh_token,
             httponly=True,
             secure=True,
             samesite='Lax'
@@ -135,7 +157,6 @@ def refresh_token(request):
 
     except Exception as e:
         return Response({'error': 'Invalid or expired refresh token'}, status=status.HTTP_401_UNAUTHORIZED)
-
 
 @api_view(['POST'])
 def logout_user(request):
