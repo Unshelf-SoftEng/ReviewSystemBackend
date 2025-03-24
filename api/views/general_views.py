@@ -1,8 +1,8 @@
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from ..utils.supabase_client import get_supabase_client
-from ..models import User, Lesson, Chapter, LessonProgress, Category, UserAbility
+from api.utils.supabase_client import get_supabase_client
+from api.models import User, Lesson, Chapter, LessonProgress, Category, UserAbility
 from django.shortcuts import get_object_or_404
 
 

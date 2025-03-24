@@ -4,31 +4,19 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 import random
 from django.utils import timezone
-from unicodedata import category
-
 from ..models import User, Question, Assessment, Answer, AssessmentResult, UserAbility, Category, Lesson, \
     LessonProgress, Class, AssessmentProgress, Chapter
 from collections import defaultdict
 from ..ai.estimate_student_ability import estimate_ability_irt
 from api.views.general_views import get_user_id_from_token
 from django.shortcuts import get_object_or_404
+from ..decorators import student_required
 
 
 @api_view(['GET'])
+@student_required
 def get_class(request):
-    supabase_uid = get_user_id_from_token(request)
-
-    if not supabase_uid:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    try:
-        user = User.objects.get(supabase_user_id=supabase_uid)
-    except User.DoesNotExist:
-        return Response({'error': 'User does not exist.'}, status=status.HTTP_404_NOT_FOUND)
-
-    if user.role != 'student':
-        return Response({"error": "You are not authorized to access this link"}, status=status.HTTP_403_FORBIDDEN)
-
+    user: User = request.user
     # Get the classes the student is enrolled in
     if user.enrolled_class is None:
         return Response({"message": "You are not enrolled in any class."}, status=status.HTTP_200_OK)
@@ -88,19 +76,9 @@ def get_class(request):
 
 
 @api_view(['POST'])
+@student_required
 def join_class(request):
-    supabase_uid = get_user_id_from_token(request)
-
-    if not supabase_uid:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    try:
-        user = User.objects.get(supabase_user_id=supabase_uid)
-    except User.DoesNotExist:
-        return Response({'error': 'User does not exist.'}, status=status.HTTP_404_NOT_FOUND)
-
-    if user.role != 'student':
-        return Response({"error": "You are not authorized to access this link"}, status=status.HTTP_403_FORBIDDEN)
+    user: User = request.user
 
     if user.enrolled_class is not None:
         return Response({'error': 'You are already enrolled in a class. You cannot join another.'},
@@ -123,19 +101,9 @@ def join_class(request):
 
 
 @api_view(['GET'])
+@student_required
 def get_initial_exam(request):
-    supabase_uid = get_user_id_from_token(request)
-
-    if not supabase_uid:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    try:
-        user = User.objects.get(supabase_user_id=supabase_uid)
-    except User.DoesNotExist:
-        return Response({'error': 'User does not not exist.'}, status=status.HTTP_404_NOT_FOUND)
-
-    if user.role != 'student':
-        return Response({"error": "You are not authorized to access this link."}, status=status.HTTP_403_FORBIDDEN)
+    user: User = request.user
 
     if user.enrolled_class is None:
         return Response({"error": "Student is not enrolled to a class"}, status=status.HTTP_403_FORBIDDEN)
@@ -154,19 +122,9 @@ def get_initial_exam(request):
     return Response(exam_data, status=status.HTTP_200_OK)
 
 
+@api_view(['GET'])
 def initial_exam_taken(request):
-    supabase_uid = get_user_id_from_token(request)
-
-    if not supabase_uid:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    try:
-        user = User.objects.get(supabase_user_id=supabase_uid)
-    except User.DoesNotExist:
-        return Response({'error': 'User does not not exist.'}, status=status.HTTP_404_NOT_FOUND)
-
-    if user.role != 'student':
-        return Response({"error": "You are not authorized to access this link."}, status=status.HTTP_403_FORBIDDEN)
+    user: User = request.user
 
     if user.enrolled_class is None:
         return Response({"error": "Student is not enrolled to a class"}, status=status.HTTP_403_FORBIDDEN)
@@ -181,18 +139,7 @@ def initial_exam_taken(request):
 
 @api_view(['GET'])
 def take_initial_exam(request):
-    supabase_uid = get_user_id_from_token(request)
-
-    if not supabase_uid:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    try:
-        user = User.objects.get(supabase_user_id=supabase_uid)
-    except User.DoesNotExist:
-        return Response({'error': 'User does not exist.'}, status=status.HTTP_404_NOT_FOUND)
-
-    if user.role != 'student':
-        return Response({"error": "You are not authorized to access this link"}, status=403)
+    user: User = request.user
 
     exam = Assessment.objects.filter(class_owner=user.enrolled_class, is_initial=True).first()
 
@@ -233,19 +180,9 @@ def take_initial_exam(request):
 
 
 @api_view(['GET'])
+@student_required
 def take_exam(request):
-    supabase_uid = get_user_id_from_token(request)
-
-    if not supabase_uid:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    try:
-        user = User.objects.get(supabase_user_id=supabase_uid)
-    except User.DoesNotExist:
-        return Response({'error': 'User does not exist.'}, status=status.HTTP_404_NOT_FOUND)
-
-    if user.role != 'student':
-        return Response({"error": "You are not authorized to access this link"}, status=403)
+    user: User = request.user
 
     # Get all questions from the database
     all_questions = Question.objects.all()
@@ -295,20 +232,9 @@ def take_exam(request):
 
 
 @api_view(['GET'])
+@student_required
 def check_time_limit(request, assessment_id):
-    supabase_uid = get_user_id_from_token(request)
-
-    if not supabase_uid:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    try:
-        user = User.objects.get(supabase_user_id=supabase_uid)
-    except User.DoesNotExist:
-        return Response({'error': 'User does not exist.'}, status=status.HTTP_404_NOT_FOUND)
-
-    if user.role != 'student':
-        return Response({"error": "You are not authorized to access this link"}, status=status.HTTP_403_FORBIDDEN)
-
+    user: User = request.user
     progress = get_object_or_404(AssessmentProgress, user=user, assessment_id=assessment_id)
 
     # Ensure assessment has a time limit field
@@ -323,19 +249,9 @@ def check_time_limit(request, assessment_id):
 
 
 @api_view(['POST'])
+@student_required
 def submit_assessment(request, assessment_id):
-    supabase_uid = get_user_id_from_token(request)
-
-    if not supabase_uid:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    try:
-        user = User.objects.get(supabase_user_id=supabase_uid)
-    except User.DoesNotExist:
-        return Response({'error': 'User does not exist.'}, status=status.HTTP_404_NOT_FOUND)
-
-    if user.role != 'student':
-        return Response({"error": "You are not authorized to access this link."}, status=status.HTTP_403_FORBIDDEN)
+    user: User = request.user
 
     # Retrieve the exam object
     assessment = get_object_or_404(Assessment, id=assessment_id)
@@ -410,19 +326,9 @@ def submit_assessment(request, assessment_id):
 
 
 @api_view(['GET'])
+@student_required
 def get_exam_results(request, assessment_id):
-    supabase_uid = get_user_id_from_token(request)
-
-    if not supabase_uid:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    try:
-        user = User.objects.get(supabase_user_id=supabase_uid)
-    except User.DoesNotExist:
-        return Response({'error': 'User does not exist.'}, status=status.HTTP_404_NOT_FOUND)
-
-    if user.role != 'student':
-        return Response({"error": "You are not authorized to access this link."}, status=403)
+    user: User = request.user
 
     # Retrieve the exam object; ensure that the exam belongs to the authenticated user
     exam = get_object_or_404(Assessment, id=assessment_id)
@@ -482,19 +388,9 @@ def get_exam_results(request, assessment_id):
 
 
 @api_view(['GET'])
+@student_required
 def get_ability(request):
-    supabase_uid = get_user_id_from_token(request)
-
-    if not supabase_uid:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    try:
-        user = User.objects.get(supabase_user_id=supabase_uid)
-    except User.DoesNotExist:
-        return Response({'error': 'User does not exist.'}, status=status.HTTP_404_NOT_FOUND)
-
-    if user.role != 'student':
-        return Response({"error": "You are not authorized to access this link."}, status=403)
+    user: User = request.user
 
     estimate_ability_irt(user.id)
 
@@ -510,20 +406,9 @@ def get_ability(request):
 
 
 @api_view(['POST'])
+@student_required
 def create_student_quiz(request):
-    supabase_uid = get_user_id_from_token(request)
-
-    if not supabase_uid:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    try:
-        user = User.objects.get(supabase_user_id=supabase_uid)
-    except User.DoesNotExist:
-        return Response({'error': 'User does not exist.'}, status=status.HTTP_404_NOT_FOUND)
-
-    if user.role != 'student':
-        return Response({"error": "You are not authorized to access this link"}, status=403)
-
+    user: User = request.user
     print(request.data)
 
     selected_categories = request.data.get('selected_categories', [])
@@ -580,20 +465,9 @@ def create_student_quiz(request):
 
 
 @api_view(['POST'])
+@student_required
 def take_lesson_quiz(request):
-    supabase_uid = get_user_id_from_token(request)
-
-    if not supabase_uid:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    try:
-        user = User.objects.get(supabase_user_id=supabase_uid)
-    except User.DoesNotExist:
-        return Response({'error': 'User does not exist.'}, status=status.HTTP_404_NOT_FOUND)
-
-    if user.role != 'student':
-        return Response({"error": "You are not authorized to access this link"}, status=403)
-
+    user: User = request.user
     data = request.data
 
     lesson_name = data.get('lesson')
@@ -639,19 +513,9 @@ def take_lesson_quiz(request):
 
 
 @api_view(['GET'])
+@student_required
 def get_class_assessments(request):
-    supabase_uid = get_user_id_from_token(request)
-
-    if not supabase_uid:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    try:
-        user = User.objects.get(supabase_user_id=supabase_uid)
-    except User.DoesNotExist:
-        return Response({'error': 'User does not exist.'}, status=status.HTTP_404_NOT_FOUND)
-
-    if user.role != 'student':
-        return Response({"error": "You are not authorized to access this link"}, status=403)
+    user: User = request.user
 
     class_owner = Class.objects.get(id=user.enrolled_class.id)
     assessments = Assessment.objects.filter(class_owner=class_owner).order_by('-created_at')
@@ -687,20 +551,9 @@ def get_class_assessments(request):
 
 
 @api_view(['GET'])
+@student_required
 def get_history(request):
-    supabase_uid = get_user_id_from_token(request)
-
-    if not supabase_uid:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    try:
-        user = User.objects.get(supabase_user_id=supabase_uid)
-    except User.DoesNotExist:
-        return Response({'error': 'User does not exist.'}, status=status.HTTP_404_NOT_FOUND)
-
-    if user.role != 'student':
-        return Response({"error": "You are not authorized to access this link"}, status=403)
-
+    user: User = request.user
     assessment_results = AssessmentResult.objects.filter(user_id=user.id)
 
     history = []
@@ -743,16 +596,9 @@ def get_history(request):
 
 
 @api_view(['GET'])
+@student_required
 def get_lessons(request):
-    user_id = get_user_id_from_token(request)
-
-    if not user_id:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    user = get_object_or_404(User, supabase_user_id=user_id)
-
-    if user.role != 'student':
-        return Response({"error": "You are not authorized to access this link"}, status=403)
+    user: User = request.user
 
     lessons = Lesson.objects.all()
     lesson_data = []
@@ -778,20 +624,10 @@ def get_lessons(request):
     return Response(lesson_data, status=status.HTTP_200_OK)
 
 
-
 @api_view(['GET'])
+@student_required
 def get_lesson(request, lesson_id):
-    user_id = get_user_id_from_token(request)
-
-    if not user_id:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    user = get_object_or_404(User, supabase_user_id=user_id)
-
-    if user.role != 'student':
-        return Response({"error": "You are not authorized to access this link"}, status=403)
-
-
+    user: User = request.user
     lesson = get_object_or_404(Lesson, id=lesson_id)
 
     if lesson.is_locked:
@@ -869,22 +705,16 @@ def get_lesson(request, lesson_id):
 
 
 @api_view(['GET'])
+@student_required
 def get_chapter(request, lesson_id, chapter_id):
+    user: User = request.user
     return Response({'error': 'Chapter does not exist.'}, status=status.HTTP_404_NOT_FOUND)
 
 
 @api_view(['POST'])
+@student_required
 def update_lesson_progress(request, lesson_id):
-    user_id = get_user_id_from_token(request)
-
-    if not user_id:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    user = get_object_or_404(User, supabase_user_id=user_id)
-
-    if user.role != "student":
-        return Response({'error': 'Only students can update progress.'}, status=status.HTTP_403_FORBIDDEN)
-
+    user: User = request.user
     lesson = get_object_or_404(Lesson, id=lesson_id)
     data = request.data
     chapter_id = data.get("chapter_id")
