@@ -2,7 +2,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from ..utils.supabase_client import get_supabase_client
-from ..models import User, Lesson, Chapter, LessonProgress
+from ..models import User, Lesson, Chapter, LessonProgress, Category, UserAbility
 from django.shortcuts import get_object_or_404
 
 
@@ -40,7 +40,11 @@ def register_user(request):
             )
             new_user.save()
 
-            # Return success response
+            if role == 'student':
+                categories = Category.objects.all()
+                for category in categories:
+                    UserAbility.objects.create(user=new_user, category=category, elo_ability=1000, irt_ability=0)
+
             return Response({'message': 'User registered successfully!'}, status=status.HTTP_201_CREATED)
         except Exception as e:
 
