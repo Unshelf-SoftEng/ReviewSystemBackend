@@ -4,12 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d83e15d4-b2c8-4a76-9aca-4b58469163cd" name="Changes" comment="feat:">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/api/models.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/models.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/api/urls.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/urls.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/api/views/student_views.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/views/student_views.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/api/views/teacher_views.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/views/teacher_views.py" afterDir="false" />
+    <list default="true" id="d83e15d4-b2c8-4a76-9aca-4b58469163cd" name="Changes" comment="fix: Improve get all questions speed">
+      <change beforePath="$PROJECT_DIR$/api/views/general_views.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/views/general_views.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -56,7 +52,7 @@
     &quot;RunOnceActivity.OpenDjangoStructureViewOnStart&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.pycharm.django.structure.promotion.once.per.project&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;rl-agent&quot;,
     &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
     &quot;last_opened_file_path&quot;: &quot;C:/Users/johni/Coding/ReviewSystemBackend/myenv&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
@@ -142,15 +138,8 @@
       <workItem from="1742582035879" duration="2018000" />
       <workItem from="1742642860504" duration="23564000" />
       <workItem from="1742723262015" duration="91000" />
-      <workItem from="1742733704119" duration="400000" />
-    </task>
-    <task id="LOCAL-00005" summary="chore: Deploy backend on Railway&#10;&#10;- Ensured the app is accessible via the domain.">
-      <option name="closed" value="true" />
-      <created>1733761968487</created>
-      <option name="number" value="00005" />
-      <option name="presentableId" value="LOCAL-00005" />
-      <option name="project" value="LOCAL" />
-      <updated>1733761968487</updated>
+      <workItem from="1742733704119" duration="1048000" />
+      <workItem from="1742777807820" duration="2240000" />
     </task>
     <task id="LOCAL-00006" summary="feat: Add class management API&#10;&#10;- Implement API endpoints for class creation and retrieving all classes&#10;- Add functionality to generate unique class codes for student enrollment&#10;- Implement API endpoint for students to join classes using class code">
       <option name="closed" value="true" />
@@ -536,7 +525,15 @@
       <option name="project" value="LOCAL" />
       <updated>1742675837013</updated>
     </task>
-    <option name="localTasksCounter" value="54" />
+    <task id="LOCAL-00054" summary="fix: Improve get all questions speed">
+      <option name="closed" value="true" />
+      <created>1742734133946</created>
+      <option name="number" value="00054" />
+      <option name="presentableId" value="LOCAL-00054" />
+      <option name="project" value="LOCAL" />
+      <updated>1742734133947</updated>
+    </task>
+    <option name="localTasksCounter" value="55" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -563,7 +560,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="feat: Add Student History" />
     <MESSAGE value="feat: Added quiz urls" />
     <MESSAGE value="feat: Fix class codes" />
     <MESSAGE value="fix(route): Issue with routing wherein the path of teacher/class/&lt;class_id&gt; gets called when accessing teacher/class/teacher" />
@@ -588,6 +584,7 @@
     <MESSAGE value="fix: Prevent Submission of Assessment after deadline" />
     <MESSAGE value="fix: Separate getting of assessment results and assessment data" />
     <MESSAGE value="feat: Edit Quizzes Data" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: Edit Quizzes Data" />
+    <MESSAGE value="fix: Improve get all questions speed" />
+    <option name="LAST_COMMIT_MESSAGE" value="fix: Improve get all questions speed" />
   </component>
 </project>

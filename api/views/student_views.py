@@ -9,7 +9,7 @@ from unicodedata import category
 from ..models import User, Question, Assessment, Answer, AssessmentResult, UserAbility, Category, Class, Lesson, \
     LessonProgress, Class, AssessmentProgress
 from collections import defaultdict
-from ..ai.estimate_student_ability import estimate_student_ability_per_category
+from ..ai.estimate_student_ability import estimate_ability_irt
 from api.views.general_views import get_user_id_from_token
 from django.shortcuts import get_object_or_404
 
