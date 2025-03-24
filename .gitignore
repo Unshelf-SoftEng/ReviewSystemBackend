@@ -1,3 +1,4 @@
 .env
 api/utils/credentials.json
 TODO.md
+*.pyc
