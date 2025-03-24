@@ -146,6 +146,7 @@ def upload_lessons_from_sheet(lesson_spreadsheet_id, lesson_range, chapter_sprea
         chapter = chapters.get(chapter_id)
         if chapter:
             section, updated = Section.objects.update_or_create(
+                id=section_id,
                 chapter=chapter,
                 number=section_number,
                 defaults={

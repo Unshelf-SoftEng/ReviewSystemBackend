@@ -4,7 +4,7 @@ from rest_framework.response import Response
 import random
 from django.utils import timezone
 from ..models import User, Question, Assessment, Answer, AssessmentResult, UserAbility, Category, Lesson, \
-    LessonProgress, Class, AssessmentProgress, Chapter
+    LessonProgress, Class, AssessmentProgress, Chapter, Section
 from collections import defaultdict
 from ..ai.estimate_student_ability import estimate_ability_irt
 from django.shortcuts import get_object_or_404
@@ -750,34 +750,23 @@ def update_lesson_progress(request, lesson_id):
     user: User = request.user
     lesson = get_object_or_404(Lesson, id=lesson_id)
     data = request.data
+
     chapter_id = data.get("chapter_id")
+    section_id = data.get("section_id")
 
-    if not chapter_id:
-        return Response({'error': 'chapter_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
-
-    chapter = get_object_or_404(Chapter, id=chapter_id, lesson=lesson)
+    chapter = get_object_or_404(Chapter, lesson=lesson, number=chapter_id)
+    section = get_object_or_404(Section, id=section_id, chapter=chapter)
 
     # Get or create lesson progress
-    lesson_progress, created = LessonProgress.objects.get_or_create(
+    lesson_progress, _ = LessonProgress.objects.get_or_create(
         user=user,
         lesson=lesson,
-        defaults={"progress_percentage": 0.0}
+        defaults={"current_chapter": chapter, "current_section": section}
     )
 
-    # Update progress
     lesson_progress.current_chapter = chapter
-
-    # Calculate progress percentage
-    total_chapters = lesson.chapters.count()
-    progress_percentage = (chapter.number / total_chapters) * 100
-    lesson_progress.progress_percentage = progress_percentage
-
+    if section:
+        lesson_progress.current_section = section
     lesson_progress.save()
 
-    return Response({
-        "message": "Lesson progress updated successfully.",
-        "progress": {
-            "current_chapter": lesson_progress.current_chapter.id,
-            "progress_percentage": lesson_progress.progress_percentage
-        }
-    }, status=status.HTTP_200_OK)
+    return Response({"message": "Lesson progress updated successfully."}, status=status.HTTP_200_OK)
