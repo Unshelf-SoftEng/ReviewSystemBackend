@@ -6,22 +6,14 @@ from ..models import User, Class, UserAbility, Assessment, AssessmentResult, Que
 from django.shortcuts import get_object_or_404
 from django.utils.dateparse import parse_datetime
 from api.views.general_views import get_user_id_from_token
+from api.decorators import role_required
 
 
 @api_view(['POST'])
+@role_required("teacher")
 def create_class(request):
-    supabase_uid = get_user_id_from_token(request)
-
-    if not supabase_uid:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    user = User.objects.get(supabase_user_id=supabase_uid)
-
-    if user.role != 'teacher':
-        return Response({"error": "Only teachers can create classes"}, status=403)
-
-    data = request.data
-    class_name = data.get('class_name')
+    user: User = request.user
+    class_name = request.data.get('class_name')
 
     if not class_name:
         return Response({"error": "Class name is required"}, status=400)
@@ -72,17 +64,9 @@ def create_class(request):
 
 
 @api_view(['GET'])
+@role_required("teacher")
 def get_classes(request):
-    supabase_uid = get_user_id_from_token(request)
-
-    if not supabase_uid:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    user = User.objects.get(supabase_user_id=supabase_uid)
-
-    if user.role != 'teacher':
-        return Response({"error": "Only teachers can get classes"}, status=403)
-
+    user: User = request.user
     classes = Class.objects.filter(teacher=user)
 
     data_result = []
@@ -100,18 +84,8 @@ def get_classes(request):
 
 
 @api_view(['GET'])
+@role_required("teacher")
 def get_class(request, class_id):
-    print("Get Class was called with class_id:", class_id)  # Debugging line
-    supabase_uid = get_user_id_from_token(request)
-
-    if not supabase_uid:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    user = User.objects.get(supabase_user_id=supabase_uid)
-
-    if user.role != 'teacher':
-        return Response({"error": "Only teachers can get classes"}, status=403)
-
     teacher_class = Class.objects.get(id=class_id)
 
     if teacher_class is None:
@@ -138,18 +112,9 @@ def get_class(request, class_id):
 
 
 @api_view(['GET'])
+@role_required("teacher")
 def view_initial_exam(request, class_id):
     print("View Initial Exam was called")
-    supabase_uid = get_user_id_from_token(request)
-
-    if not supabase_uid:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    user = User.objects.get(supabase_user_id=supabase_uid)
-
-    if user.role != 'teacher':
-        return Response({"error": "Only teachers can get classes"}, status=status.HTTP_403_FORBIDDEN)
-
     class_owner = Class.objects.get(id=class_id)
 
     # Retrieve the exam object; ensure that the exam belongs to the authenticated user
@@ -164,25 +129,11 @@ def view_initial_exam(request, class_id):
 
 
 @api_view(['POST'])
+@role_required("teacher")
 def open_initial_exam(request, class_id):
-    supabase_uid = get_user_id_from_token(request)
-
-    if not supabase_uid:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    user = User.objects.get(supabase_user_id=supabase_uid)
-
-    if user.role != 'teacher':
-        return Response({"error": "Only teachers can get classes"}, status=403)
-
-    data = request.data
-
-    deadline = data['deadline']
-
+    deadline = request.data['deadline']
     class_owner = Class.objects.get(id=class_id)
-
     exam = Assessment.objects.get(class_owner=class_owner, is_initial=True)
-
     exam.deadline = deadline
     exam.save()
 
@@ -190,16 +141,8 @@ def open_initial_exam(request, class_id):
 
 
 @api_view(['GET'])
+@role_required("teacher")
 def get_student_data(request, student_id):
-    supabase_uid = get_user_id_from_token(request)
-
-    if not supabase_uid:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    teacher = get_object_or_404(User, supabase_user_id=supabase_uid)
-
-    if teacher.role != 'teacher':
-        return Response({"error": "Only teachers can access student data"}, status=status.HTTP_403_FORBIDDEN)
 
     student = get_object_or_404(User, id=student_id)
 
@@ -235,45 +178,26 @@ def get_student_data(request, student_id):
 
 
 @api_view(['GET'])
+@role_required("teacher")
 def get_all_questions(request):
-    supabase_uid = get_user_id_from_token(request)
-
-    if not supabase_uid:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    teacher = get_object_or_404(User, supabase_user_id=supabase_uid)
-
-    if teacher.role != 'teacher':
-        return Response({"error": "Only teachers can access student data"}, status=status.HTTP_403_FORBIDDEN)
-
-    # Use select_related to minimize queries (joins category to Question)
     questions = Question.objects.select_related('category').values('id', 'question_text', 'category__name')
 
     return Response(list(questions), status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
+@role_required("teacher")
 def create_quiz(request, class_id):
     print("Create Quiz was Called")
-    supabase_uid = get_user_id_from_token(request)
 
-    if not supabase_uid:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    teacher = get_object_or_404(User, supabase_user_id=supabase_uid)
-
-    if teacher.role != 'teacher':
-        return Response({"error": "Only teachers can access student data"}, status=status.HTTP_403_FORBIDDEN)
-
-    data = request.data
-    question_source = data.get('question_source')
-    questions = data.get('questions')
+    question_source = request.data.get('question_source')
+    questions = request.data.get('questions')
 
     if not question_source:
         return Response({'error': 'Question source not provided'}, status=status.HTTP_400_BAD_REQUEST)
 
     class_owner = Class.objects.get(id=class_id)
-    quiz = Assessment.objects.create(name=data.get('name'), class_owner=class_owner)
+    quiz = Assessment.objects.create(name=request.data('name'), class_owner=class_owner)
 
     selected_categories = []
     selected_questions = []
@@ -287,7 +211,7 @@ def create_quiz(request, class_id):
 
         quiz.selected_categories.set(selected_categories)
         quiz.questions.set(selected_questions)
-        quiz.deadline = parse_datetime(data.get('deadline')) if data.get('deadline') else None
+        quiz.deadline = parse_datetime(request.data.get('deadline')) if request.data.get('deadline') else None
         quiz.no_of_questions = data.get('no_of_questions')
         quiz.type = "quiz"
         quiz.status = "created"
@@ -305,19 +229,9 @@ def create_quiz(request, class_id):
 
 
 @api_view(['GET'])
+@role_required("teacher")
 def get_class_assessments(request, class_id):
     print("Get All Quizzes was called")
-
-    supabase_uid = get_user_id_from_token(request)
-
-    if not supabase_uid:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    teacher = get_object_or_404(User, supabase_user_id=supabase_uid)
-
-    if teacher.role != 'teacher':
-        return Response({"error": "Only teachers can access student data"}, status=status.HTTP_403_FORBIDDEN)
-
     class_obj = Class.objects.get(id=class_id)
 
     assessments = Assessment.objects.filter(class_owner=class_obj).order_by("-created_at")
@@ -342,16 +256,8 @@ def get_class_assessments(request, class_id):
 
 
 @api_view(['GET'])
+@role_required("teacher")
 def get_assessment_data(request, assessment_id):
-    supabase_uid = get_user_id_from_token(request)
-
-    if not supabase_uid:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    teacher = get_object_or_404(User, supabase_user_id=supabase_uid)
-
-    if teacher.role != 'teacher':
-        return Response({"error": "Only teachers can access assessment data"}, status=status.HTTP_403_FORBIDDEN)
 
     assessment = get_object_or_404(Assessment, id=assessment_id)
 
@@ -381,17 +287,8 @@ def get_assessment_data(request, assessment_id):
 
 
 @api_view(['GET'])
+@role_required("teacher")
 def get_assessment_results(request, assessment_id):
-    supabase_uid = get_user_id_from_token(request)
-
-    if not supabase_uid:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    teacher = get_object_or_404(User, supabase_user_id=supabase_uid)
-
-    if teacher.role != 'teacher':
-        return Response({"error": "Only teachers can access student results"}, status=status.HTTP_403_FORBIDDEN)
-
     assessment = get_object_or_404(Assessment, id=assessment_id)
     students = User.objects.filter(enrolled_class=assessment.class_owner)
     students_data = []
@@ -426,17 +323,8 @@ def get_assessment_results(request, assessment_id):
 
 
 @api_view(['POST'])
+@role_required("teacher")
 def update_assessment(request, assessment_id):
-    supabase_uid = get_user_id_from_token(request)
-
-    if not supabase_uid:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    teacher = get_object_or_404(User, supabase_user_id=supabase_uid)
-
-    if teacher.role != 'teacher':
-        return Response({"error": "You are not authorized to access this link"}, status=status.HTTP_403_FORBIDDEN)
-
     questions = request.data.get('questions')
     assessment = get_object_or_404(Assessment, id=assessment_id)
     deadline = parse_datetime(request.data.get('deadline')) if request.data.get('deadline') else None
@@ -455,17 +343,9 @@ def update_assessment(request, assessment_id):
     return Response({"message": "Quiz was successfully updated"}, status=status.HTTP_200_OK)
 
 
+@api_view(['POST'])
+@role_required("teacher")
 def delete_assessment(request, quiz_id):
-    supabase_uid = get_user_id_from_token(request)
-
-    if not supabase_uid:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    teacher = get_object_or_404(User, supabase_user_id=supabase_uid)
-
-    if teacher.role != 'teacher':
-        return Response({"error": "Only teachers can access student data"}, status=status.HTTP_403_FORBIDDEN)
-
     assessment = get_object_or_404(Assessment, id=quiz_id)
 
     # Check for related AssessmentResult or AssessmentProgress
@@ -483,13 +363,9 @@ def delete_assessment(request, quiz_id):
 
 
 @api_view(['GET'])
+@role_required("teacher")
 def get_lesson_teacher(request, lesson_id):
-    user_id = get_user_id_from_token(request)
-
-    if not user_id:
-        return Response({'error': 'User not authenticated.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    user = get_object_or_404(User, supabase_user_id=user_id)
+    user: User = request.user
     lesson = get_object_or_404(Lesson, id=lesson_id)
 
     if lesson.is_locked:

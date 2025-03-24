@@ -1,5 +1,5 @@
 from django.urls import path
-from ..views import student_views
+from api.views import student_views
 
 urlpatterns = [
     path('class', student_views.get_class, name='get_student_class'),
