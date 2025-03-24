@@ -27,37 +27,31 @@ def get_class(request):
         if lesson.is_locked:
             lesson_data.append({
                 "id": lesson.id,
-                "lesson_name": lesson.lesson_name,
-                "progress_percentage": None,  # No progress shown for locked lessons
-                "current_chapter": None,
-                "current_part": None,
+                "lesson_name": lesson.name,
                 "is_locked": True
             })
-            continue  # Skip to the next lesson
+            continue
 
         progress = LessonProgress.objects.filter(user=user, lesson=lesson).first()
 
         if not progress:
-            progress = LessonProgress(user=user, lesson=lesson)
-
-        # Get total number of chapters in the lesson
-        total_chapters = lesson.chapters.count()
-
-        # Calculate progress percentage
-        if progress.current_chapter:
-            completed_chapters = progress.current_chapter.chapter_number
-            progress_percentage = (completed_chapters / total_chapters) * 100 if total_chapters > 0 else 0.0
+            lesson_data.append({
+                "id": lesson.id,
+                "lesson_name": lesson.name,
+                "progress_percentage": 0.0,
+            })
         else:
-            progress_percentage = 0.0  # Default to 0% if no progress
+            total_chapters = lesson.chapters.count()
+            completed_chapters = progress.current_chapter.number
+            progress_percentage = (completed_chapters / total_chapters) * 100 if total_chapters > 0 else 0.0
 
-        lesson_data.append({
-            "id": lesson.id,
-            "lesson_name": lesson.lesson_name,
-            "progress_percentage": progress_percentage,
-            "current_chapter": progress.current_chapter.chapter_name if progress.current_chapter else None,
-            "current_part": progress.current_part.title if progress.current_part else None,
-            "is_locked": False
-        })
+            lesson_data.append({
+                "id": lesson.id,
+                "lesson_name": lesson.name,
+                "progress_percentage": progress_percentage,
+                "current_chapter": progress.current_chapter.name if progress.current_chapter else None,
+                "current_part": progress.current_part.title if progress.current_part else None,
+            })
 
     class_obj = user.enrolled_class
 
@@ -597,33 +591,33 @@ def get_history(request):
     return Response(history, status=status.HTTP_200_OK)
 
 
-@api_view(['GET'])
-@auth_required("student")
-def get_lessons(request):
-    user: User = request.user
-
-    lessons = Lesson.objects.all()
-    lesson_data = []
-
-    for lesson in lessons:
-        lesson_progress, _ = LessonProgress.objects.get_or_create(
-            user=user,
-            lesson=lesson,
-            defaults={"progress_percentage": 0.0}
-        )
-
-        lesson_data.append({
-            "id": lesson.id,
-            "lesson_name": lesson.name,
-            "is_locked": lesson.is_locked,
-            "progress": {
-                "current_chapter": lesson_progress.current_chapter.id if lesson_progress.current_chapter else None,
-                "current_section": lesson_progress.current_section.id if lesson_progress.current_section else None,
-                "progress_percentage": lesson_progress.progress_percentage
-            }
-        })
-
-    return Response(lesson_data, status=status.HTTP_200_OK)
+# @api_view(['GET'])
+# @auth_required("student")
+# def get_lessons(request):
+#     user: User = request.user
+#
+#     lessons = Lesson.objects.all()
+#     lesson_data = []
+#
+#     for lesson in lessons:
+#         lesson_progress, _ = LessonProgress.objects.get_or_create(
+#             user=user,
+#             lesson=lesson,
+#             defaults={"progress_percentage": 0.0}
+#         )
+#
+#         lesson_data.append({
+#             "id": lesson.id,
+#             "lesson_name": lesson.name,
+#             "is_locked": lesson.is_locked,
+#             "progress": {
+#                 "current_chapter": lesson_progress.current_chapter.id if lesson_progress.current_chapter else None,
+#                 "current_section": lesson_progress.current_section.id if lesson_progress.current_section else None,
+#                 "progress_percentage": lesson_progress.progress_percentage
+#             }
+#         })
+#
+#     return Response(lesson_data, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
@@ -642,68 +636,77 @@ def get_lesson(request, lesson_id):
             status=status.HTTP_403_FORBIDDEN
         )
 
-    chapters = lesson.chapters.all().order_by("chapter_number")
+    chapters = lesson.chapters.all().order_by("number")
+    first_chapter = lesson.chapters.first()
+    first_section = first_chapter.sections.first()
 
     # Get lesson progress if the user is a student
     lesson_progress, _ = LessonProgress.objects.get_or_create(
         user=user,
         lesson=lesson,
-        defaults={"progress_percentage": 0.0}
+        defaults={
+            "current_chapter": first_chapter,
+            "current_section": first_section,
+        }
     )
-
     lesson_structure = []
 
     for chapter in chapters:
 
-        is_chapter_completed = lesson_progress.current_chapter and chapter.chapter_number < lesson_progress.current_chapter.chapter_number
-
         chapter_data = {
             "id": chapter.id,
-            "chapter_name": chapter.chapter_name,
-            "chapter_number": chapter.chapter_number,
+            "chapter_number": chapter.number,
+            "chapter_name": chapter.name,
             "is_main_chapter": chapter.is_main_chapter,
             "is_locked": chapter.is_locked,
-            "completed": is_chapter_completed,
-            "sections": []
         }
 
-        for section in chapter.sections.all():
-            is_section_completed = lesson_progress.current_part and section.number < lesson_progress.current_part.part_number
+        if not chapter.is_locked:
+            is_chapter_completed = chapter.number < lesson_progress.current_chapter.number
 
-            chapter_data["sections"].append({
-                "id": section.id,
-                "title": section.name,
-                "part_number": section.number,
-                "completed": is_section_completed
-            })
+            chapter_data["completed"] = is_chapter_completed
+            chapter_data["structure"] = []
+
+            for section in chapter.sections.all():
+                is_section_completed = (
+                        lesson_progress.current_section is not None
+                        and section.number < lesson_progress.current_section.number
+                )
+
+                chapter_data["structure"].append({
+                    "section_id": section.id,
+                    "section_number": section.number,
+                    "section_name": section.name,
+                    "completed": is_section_completed
+                })
+
+            if chapter.is_main_chapter:
+                chapter_data["structure"].append({
+                    "type": "quiz",
+                    "title": f"Quiz for {chapter.name}",
+                    "completed": AssessmentResult.objects.filter(assessment__chapter=chapter).exists()
+                })
 
         lesson_structure.append(chapter_data)
 
-        # TODO: Check how to properly check if the quiz was completed
-
-        # is_quiz_taken = AssessmentResult.objects.filter(assessment=lesson, user=user).exists()
-        if chapter.is_main_chapter:
-            lesson_structure.append({
-                "type": "quiz",
-                "title": f"Quiz for {chapter.chapter_name}",
-                "completed": is_chapter_completed
-            })
-
-    # Add the final lesson quiz at the end
     lesson_structure.append({
         "type": "quiz",
         "title": "Final Lesson Quiz",
-        "completed": lesson_progress.progress_percentage == 100.0  # Completed if progress is 100%
+        "completed": AssessmentResult.objects.filter(assessment__lesson=lesson).exists()
     })
+
+    total_chapters = lesson.chapters.count()
+    completed_chapters = lesson_progress.current_chapter.number
+    progress_percentage = (completed_chapters / total_chapters) * 100 if total_chapters > 0 else 0.0
 
     lesson_data = {
         "id": lesson.id,
         "lesson_name": lesson.name,
         "structure": lesson_structure,
         "progress": {
-            "current_chapter": lesson_progress.current_chapter.id if lesson_progress.current_chapter else None,
-            "current_part": lesson_progress.current_part.id if lesson_progress.current_part else None,
-            "progress_percentage": lesson_progress.progress_percentage
+            "current_chapter": lesson_progress.current_chapter.name,
+            "current_section": lesson_progress.current_section.name if lesson_progress.current_section is not None else None,
+            "progress_percentage": round(progress_percentage, 2)
         }
     }
 
@@ -713,8 +716,32 @@ def get_lesson(request, lesson_id):
 @api_view(['GET'])
 @auth_required("student")
 def get_chapter(request, lesson_id, chapter_id):
-    user: User = request.user
-    return Response({'error': 'Chapter does not exist.'}, status=status.HTTP_404_NOT_FOUND)
+    chapter = get_object_or_404(Chapter, id=chapter_id)
+
+    if chapter.is_locked:
+        return Response(
+            {'error': 'Lesson is currently locked. Please wait till the teacher opens it'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    section_data = []
+
+    for section in chapter.sections.all():
+        section_data.append({
+            "id": section.id,
+            "number": section.number,
+            "title": section.name,
+            "content": section.content,
+        })
+
+    chapter_data = {
+        "id": chapter.id,
+        "chapter_number": chapter.number,
+        "chapter_name": chapter.name,
+        "sections": section_data
+    }
+
+    return Response(chapter_data, status=status.HTTP_404_NOT_FOUND)
 
 
 @api_view(['POST'])

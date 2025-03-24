@@ -89,6 +89,7 @@ class Assessment(models.Model):
 
     class_owner = models.ForeignKey('Class', on_delete=models.CASCADE, null=True, blank=True)
     lesson = models.ForeignKey('Lesson', on_delete=models.CASCADE, null=True, blank=True)
+    chapter = models.ForeignKey('Chapter', on_delete=models.CASCADE, null=True, blank=True)
     created_by = models.ForeignKey('User', on_delete=models.SET_NULL, null=True, blank=True)
 
     questions = models.ManyToManyField("Question", related_name="assessments")
@@ -156,7 +157,6 @@ class Lesson(models.Model):
         return self.name
 
 
-
 class Chapter(models.Model):
     lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name='chapters')
     name = models.CharField(max_length=255)
@@ -172,7 +172,7 @@ class Chapter(models.Model):
 
 
 class Section(models.Model):
-    chapter = models.ForeignKey(Chapter, on_delete=models.CASCADE, related_name='parts')
+    chapter = models.ForeignKey(Chapter, on_delete=models.CASCADE, related_name='sections')
     name = models.CharField(max_length=255)
     number = models.PositiveIntegerField()
     content = models.TextField()
@@ -187,9 +187,8 @@ class Section(models.Model):
 class LessonProgress(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='lesson_progress')
     lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name='progress')
-    current_chapter = models.ForeignKey(Chapter, on_delete=models.SET_NULL, null=True, blank=True,
-                                        related_name='progress')
-    current_section = models.ForeignKey(Section, on_delete=models.SET_NULL, null=True, blank=True, related_name='progress')
+    current_chapter = models.ForeignKey(Chapter, on_delete=models.CASCADE, related_name='progress')
+    current_section = models.ForeignKey(Section, on_delete=models.CASCADE, related_name='progress', null=True, blank=True)
 
     def __str__(self):
         return f"{self.user.full_name} - {self.lesson.name} | Chapter: {self.current_chapter} | Section: {self.current_section}"
