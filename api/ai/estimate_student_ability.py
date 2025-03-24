@@ -43,13 +43,13 @@ def estimate_theta_for_answers(answers):
     return result.x[0] if result.success else None
 
 
-def estimate_student_ability_per_category(user_id):
+def estimate_ability_irt(user_id):
     """Estimate student ability (theta) per category using the 3PL model and MLE."""
 
     print(user_id)
 
-    results = AssessmentResult.objects.filter(user_id=user_id)
-    all_answers = Answer.objects.filter(assessment_result__in=results)
+    user = User.objects.get(pk=user_id)
+    all_answers = Answer.objects.filter(assessment_result__user=user)
 
     if not all_answers.exists():
         return {"error": "Student has not taken any assessments."}
@@ -76,10 +76,47 @@ def estimate_student_ability_per_category(user_id):
         category_obj = category_objs.get(category_name)
 
         if category_obj:
+            user_ability = UserAbility.objects.get(category=category_obj, user=user)
+            user_ability.ability_level = ability_level
+            user_ability.save()
+
+
+def estimate_ability_elo(user_id):
+    """
+    Estimate and update student ability using the Elo rating system.
+    """
+    k = 32  # Learning rate (can be tuned based on system performance)
+    user = User.objects.get(pk=user_id)
+    assessment_results = AssessmentResult.objects.filter(user=user).order_by('id')
+
+    if not assessment_results.exists():
+        return {"error": "Student has not taken any assessments."}
+
+    for result in assessment_results:
+        categories = result.assessment.selected_categories
+
+        for category in categories:
             user_ability, created = UserAbility.objects.get_or_create(
-                category=category_obj, user_id=user_id,
-                defaults={"ability_level": ability_level}  # Use the correct field name
+                user=user,
+                category=category,
+                defaults={
+                    "elo_ability": 1000,
+                    "irt_ability": 0
+                }
             )
-            if not created:  # If the record exists, update it
-                user_ability.ability_level = ability_level
-                user_ability.save()
+
+            # Calculate expected score
+            total_difficulty = 0
+            for question in result.assessment.selected_questions:
+                total_difficulty += question.difficulty
+
+            avg_difficulty = total_difficulty / len(result.assessment.selected_questions)
+            expected_score = 1 / (1 + 10 ** ((avg_difficulty - user_ability.ability_level) / 400))
+
+            # Normalize the actual performance (score percentage)
+            actual_score = result.score / 100.0
+
+            # Update Elo rating
+            new_ability = user_ability.ability_level + k * (actual_score - expected_score)
+            user_ability.ability_level = new_ability
+            user_ability.save()
