@@ -11,6 +11,7 @@ from django.shortcuts import get_object_or_404
 from ..decorators import auth_required
 
 
+
 @api_view(['GET'])
 @auth_required("student")
 def get_class(request):
@@ -76,8 +77,7 @@ def join_class(request):
         return Response({'error': 'You are already enrolled in a class. You cannot join another.'},
                         status=status.HTTP_400_BAD_REQUEST)
 
-    data = request.data
-    code = data.get('class_code')
+    code = request.data.get('class_code')
 
     if not code:
         return Response({'error': 'Class code is required.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -96,8 +96,6 @@ def join_class(request):
 @auth_required("student")
 def get_initial_exam(request):
     user: User = request.user
-
-    print("Request User", request.user)
 
     if user.enrolled_class is None:
         return Response({"error": "Student is not enrolled to a class"}, status=status.HTTP_403_FORBIDDEN)
@@ -124,7 +122,6 @@ def initial_exam_taken(request):
     if user.enrolled_class is None:
         return Response({"error": "Student is not enrolled to a class"}, status=status.HTTP_403_FORBIDDEN)
 
-    # Retrieve the exam object; ensure that the exam belongs to the authenticated user
     exam = get_object_or_404(Assessment, class_owner=user.enrolled_class, is_initial=True)
 
     exam_result = AssessmentResult.objects.filter(exam=exam, user=user)
@@ -149,7 +146,9 @@ def take_initial_exam(request):
         return Response({'error': 'The deadline for this assessment has already passed.'},
                         status=status.HTTP_400_BAD_REQUEST)
 
-    # Format the questions and answers to send back to the frontend
+    if AssessmentResult.objects.filter(exam=exam, user=user).exists():
+        return Response({'error': 'Student has already taken the exam.'}, status=status.HTTP_400_BAD_REQUEST)
+
     exam_data = {
         'exam_id': exam.id,
         'no_of_items': exam.questions.count(),
@@ -166,7 +165,7 @@ def take_initial_exam(request):
         'question_ids': [question.id for question in exam.questions.all()],
     }
 
-    AssessmentProgress.objects.get_or_create(
+    AssessmentProgress.objects.create(
         assessment=exam,
         user=user,
         defaults={'start_time': timezone.now()}
@@ -178,15 +177,15 @@ def take_initial_exam(request):
 @api_view(['GET'])
 @auth_required("student")
 def take_exam(request):
+    no_of_items = 60
     user: User = request.user
 
-    # Get all questions from the database
     all_questions = Question.objects.all()
 
     if not all_questions:
         return Response({'error': 'No questions available to generate an exam.'}, status=status.HTTP_404_NOT_FOUND)
 
-    selected_questions = random.sample(list(all_questions), 1)
+    selected_questions = random.sample(list(all_questions), no_of_items)
 
     # Create a new exam instance for the authenticated user
     exam = Assessment.objects.create(
@@ -202,11 +201,8 @@ def take_exam(request):
 
     exam.selected_categories.set(categories)
     exam.questions.set(selected_questions)
-    exam.time_limit = 90 * len(selected_questions)
+    exam.time_limit = 90 * no_of_items
     exam.save()
-
-    if exam.deadline is not None:
-        AssessmentProgress.objects.create(assessment=exam, user=user)
 
     # Format the questions and answers to send back to the frontend
     exam_data = {
@@ -231,15 +227,20 @@ def take_exam(request):
 @auth_required("student")
 def check_time_limit(request, assessment_id):
     user: User = request.user
-    progress = get_object_or_404(AssessmentProgress, user=user, assessment_id=assessment_id)
 
-    # Ensure assessment has a time limit field
-    if not hasattr(progress.assessment, 'time_limit'):
-        return Response({"error": "Assessment time limit not found"}, status=status.HTTP_400_BAD_REQUEST)
+    assessment: Assessment = Assessment.objects.filter(id=assessment_id).first()
+
+    if assessment.time_limit is None:
+        return Response({'error': 'No time limit.'}, status=status.HTTP_404_NOT_FOUND)
+
+    progress = get_object_or_404(AssessmentProgress, user=user, assessment_id=assessment_id)
 
     elapsed_time = (timezone.now() - progress.start_time).total_seconds()
     total_time_allowed = progress.assessment.time_limit
-    time_left = max(0, total_time_allowed - elapsed_time)
+    time_left = total_time_allowed - elapsed_time
+
+    if elapsed_time > total_time_allowed:
+        return Response({'error': 'Time limit exceeded.'}, status=status.HTTP_400_BAD_REQUEST)
 
     return Response({"time_left": int(time_left)}, status=status.HTTP_200_OK)
 
@@ -256,10 +257,9 @@ def submit_assessment(request, assessment_id):
         assessment_progress = AssessmentProgress.objects.filter(user=user, assessment=assessment).first()
         time_elapsed = (timezone.now() - assessment_progress.start_time).total_seconds()
 
-        is_auto_submission = time_elapsed >= assessment.time_limit if assessment.time_limit else False
+        is_auto_submission = time_elapsed == assessment.time_limit if assessment.time_limit else False
 
         if not is_auto_submission:
-            # Prevent manual submission after the deadline
             if assessment.deadline and assessment.deadline < timezone.now():
                 return Response({'error': 'The deadline for this assessment has already passed.'},
                                 status=status.HTTP_400_BAD_REQUEST)

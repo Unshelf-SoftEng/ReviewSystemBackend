@@ -17,12 +17,11 @@ def register_user(request):
         last_name = data.get('last_name')
         role = data.get('role')
 
-        supabase = get_supabase_client()
+        supabase_client = get_supabase_client()
 
-        # Register the user with Supabase Auth
         try:
-            # Supabase registration call
-            auth_response = supabase.auth.sign_up({
+
+            auth_response = supabase_client.auth.sign_up({
                 'email': email,
                 'password': password,
                 'options': {

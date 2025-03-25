@@ -17,8 +17,7 @@ urlpatterns = [
     path('lessons/', teacher_views.get_lessons, name='get_lessons'),
     path('lesson/<int:lesson_id>/chapter/<int:chapter_id>', teacher_views.get_chapter, name='get_lesson'),
     path('lesson/<int:lesson_id>', teacher_views.get_lesson, name='get_lesson'),
-
     path('class/<int:class_id>/lesson/<int:lesson_id>/results', teacher_views.get_lesson_quiz, name='get_lesson_quiz'),
-
     path('class/<int:class_id>/chapter/<int:chapter_id>/results', teacher_views.get_chapter_quiz, name='get_chapter_quiz'),
+    path('class/<int:class_id>/create-initial-exam', teacher_views.create_initial_assessment, name='create_initial_assessment'),
 ]
