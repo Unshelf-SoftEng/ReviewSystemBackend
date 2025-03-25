@@ -23,7 +23,6 @@ def get_class(request):
     lesson_data = []
 
     for lesson in lessons:
-        # Skip progress calculation if the lesson is locked
         if lesson.is_locked:
             lesson_data.append({
                 "id": lesson.id,
@@ -43,14 +42,15 @@ def get_class(request):
         else:
             total_chapters = lesson.chapters.count()
             completed_chapters = progress.current_chapter.number
+            print("Progress", total_chapters, completed_chapters)
             progress_percentage = (completed_chapters / total_chapters) * 100 if total_chapters > 0 else 0.0
 
             lesson_data.append({
                 "id": lesson.id,
                 "lesson_name": lesson.name,
-                "progress_percentage": progress_percentage,
+                "progress_percentage": round(progress_percentage, 2),
                 "current_chapter": progress.current_chapter.name if progress.current_chapter else None,
-                "current_part": progress.current_part.title if progress.current_part else None,
+                "current_part": progress.current_section.name if progress.current_section else None,
             })
 
     class_obj = user.enrolled_class

@@ -5,12 +5,14 @@ from django.core.exceptions import ObjectDoesNotExist
 from api.utils.supabase_client import get_supabase_client
 from api.models import User
 
+
 def auth_required(*allowed_roles):
     """
     Decorator to authenticate users.
     - If no roles are specified, only authentication is required.
     - If roles are specified, the user must have one of the allowed roles.
     """
+
     def decorator(view_func):
         @wraps(view_func)
         def wrapped_view(request, *args, **kwargs):
@@ -25,20 +27,18 @@ def auth_required(*allowed_roles):
 
             try:
                 user_data = supabase_client.auth.get_user(jwt=token)
-            except Exception:
-                # Token might be expired, try refreshing it
+            except Exception as e:
+
+                print(f"Error fetching user data: {str(e)}")  # Log the error
+
                 if refresh_token:
                     try:
                         new_session = supabase_client.auth.refresh_session(refresh_token=refresh_token)
-                        if not new_session or not new_session.session:
-                            return Response({'error': 'Token refresh failed. Please log in again.'},
-                                            status=status.HTTP_401_UNAUTHORIZED)
-
-                        # Extract new access and refresh tokens
                         new_access_token = new_session.session.access_token
                         new_refresh_token = new_session.session.refresh_token
-
-                        # Create response and update cookies
+                        user_data = supabase_client.auth.get_user(jwt=new_access_token)
+                        user = User.objects.get(supabase_user_id=user_data.user.id)
+                        request.user = user
                         response = view_func(request, *args, **kwargs)
                         response.set_cookie(
                             key='jwt_token',
@@ -54,9 +54,12 @@ def auth_required(*allowed_roles):
                             secure=True,
                             samesite='Lax'
                         )
+
                         return response
 
-                    except Exception:
+                    except Exception as e:
+                        print(f"Here we have Error fetching user data: {str(e)}")  # Log the error
+
                         return Response({'error': 'Invalid or expired refresh token. Please log in again.'},
                                         status=status.HTTP_401_UNAUTHORIZED)
                 else:
