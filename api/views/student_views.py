@@ -16,7 +16,7 @@ from ..decorators import auth_required
 @auth_required("student")
 def get_class(request):
     user: User = request.user
-    # Get the classes the student is enrolled in
+
     if user.enrolled_class is None:
         return Response({"message": "You are not enrolled in any class."}, status=status.HTTP_200_OK)
 
@@ -82,11 +82,11 @@ def join_class(request):
     if not code:
         return Response({'error': 'Class code is required.'}, status=status.HTTP_400_BAD_REQUEST)
     try:
-        class_instance = Class.objects.get(class_code=code)  # Fetch class with the given code
+        class_obj = Class.objects.get(class_code=code)
     except Class.DoesNotExist:
         return Response({'error': 'Class does not exist.'}, status=status.HTTP_404_NOT_FOUND)
 
-    user.enrolled_class = class_instance
+    user.enrolled_class = class_obj
     user.save()
 
     return Response({'message': 'Successfully joined the class.'}, status=status.HTTP_200_OK)
@@ -100,7 +100,6 @@ def get_initial_exam(request):
     if user.enrolled_class is None:
         return Response({"error": "Student is not enrolled to a class"}, status=status.HTTP_403_FORBIDDEN)
 
-    # Retrieve the exam object; ensure that the exam belongs to the authenticated user
     exam = get_object_or_404(Assessment, class_owner=user.enrolled_class, is_initial=True)
 
     exam_data = {
@@ -119,14 +118,15 @@ def get_initial_exam(request):
 def initial_exam_taken(request):
     user: User = request.user
 
-    if user.enrolled_class is None:
+    if user.enrolled_class:
+        exists = AssessmentResult.objects.filter(
+            assessment__class_owner=user.enrolled_class,
+            assessment__is_initial=True
+        ).exists()
+
+        return Response({'taken': exists}, status=status.HTTP_200_OK)
+    else:
         return Response({"error": "Student is not enrolled to a class"}, status=status.HTTP_403_FORBIDDEN)
-
-    exam = get_object_or_404(Assessment, class_owner=user.enrolled_class, is_initial=True)
-
-    exam_result = AssessmentResult.objects.filter(exam=exam, user=user)
-
-    return Response({"taken": exam_result.exists()}, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
@@ -134,42 +134,45 @@ def initial_exam_taken(request):
 def take_initial_exam(request):
     user: User = request.user
 
-    exam = Assessment.objects.filter(class_owner=user.enrolled_class, is_initial=True).first()
+    exam = Assessment.objects.filter(
+        class_owner=user.enrolled_class, is_initial=True
+    ).prefetch_related("questions").only("id", "time_limit", "deadline").first()
 
-    if exam is None:
+    if not exam:
         return Response({"error": "Can't find initial exam"}, status=status.HTTP_404_NOT_FOUND)
 
-    if exam.deadline is None:
-        return Response({'error': 'Exam is not open.'}, status=status.HTTP_400_BAD_REQUEST)
+    if not exam.deadline or exam.deadline < timezone.now():
+        return Response({'error': 'Exam is not available.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    if exam.deadline and exam.deadline < timezone.now():
-        return Response({'error': 'The deadline for this assessment has already passed.'},
-                        status=status.HTTP_400_BAD_REQUEST)
-
-    if AssessmentResult.objects.filter(exam=exam, user=user).exists():
+    if AssessmentResult.objects.filter(assessment=exam, user=user).exists():
         return Response({'error': 'Student has already taken the exam.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Fetch questions only once to prevent multiple queries
+    questions = list(exam.questions.all())
 
     exam_data = {
         'exam_id': exam.id,
-        'no_of_items': exam.questions.count(),
+        'no_of_items': len(questions),
         'time_limit': exam.time_limit,
         'questions': [
             {
                 'question_id': question.id,
                 'image_url': question.image_url,
                 'question_text': question.question_text,
-                'choices': list(question.choices.values()),
+                'choices': question.choices if isinstance(question.choices, list) else list(question.choices.values()),
             }
-            for question in exam.questions.all()
+            for question in questions
         ],
-        'question_ids': [question.id for question in exam.questions.all()],
+        'question_ids': [question.id for question in questions],
     }
 
-    AssessmentProgress.objects.create(
-        assessment=exam,
-        user=user,
-        defaults={'start_time': timezone.now()}
-    )
+    # Only create AssessmentProgress if it does NOT exist
+    if not AssessmentProgress.objects.filter(assessment=exam, user=user).exists():
+        AssessmentProgress.objects.create(
+            assessment=exam,
+            user=user,
+            start_time=timezone.now()
+        )
 
     return Response(exam_data, status=status.HTTP_200_OK)
 
@@ -180,29 +183,27 @@ def take_exam(request):
     no_of_items = 60
     user: User = request.user
 
-    all_questions = Question.objects.all()
+    total_questions = Question.objects.count()
 
-    if not all_questions:
+    if total_questions == 0:
         return Response({'error': 'No questions available to generate an exam.'}, status=status.HTTP_404_NOT_FOUND)
 
-    selected_questions = random.sample(list(all_questions), no_of_items)
+    num_to_fetch = min(no_of_items, total_questions)
+    selected_questions = list(Question.objects.order_by('?')[:num_to_fetch])
 
-    # Create a new exam instance for the authenticated user
+    # Create the exam instance
     exam = Assessment.objects.create(
         created_by=user,
         type='Exam',
         source='student_initiated',
+        time_limit=90 * num_to_fetch,
     )
 
-    categories = set()
-    for question in selected_questions:
-        category = Category.objects.get(id=question.category_id)
-        categories.add(category)
+    category_ids = set(selected_questions[i].category_id for i in range(len(selected_questions)))
+    categories = Category.objects.filter(id__in=category_ids)
 
     exam.selected_categories.set(categories)
     exam.questions.set(selected_questions)
-    exam.time_limit = 90 * no_of_items
-    exam.save()
 
     # Format the questions and answers to send back to the frontend
     exam_data = {
@@ -249,60 +250,53 @@ def check_time_limit(request, assessment_id):
 @auth_required("student")
 def submit_assessment(request, assessment_id):
     user: User = request.user
-
-    # Retrieve the exam object
     assessment = get_object_or_404(Assessment, id=assessment_id)
 
-    if assessment.deadline:
-        assessment_progress = AssessmentProgress.objects.filter(user=user, assessment=assessment).first()
-        time_elapsed = (timezone.now() - assessment_progress.start_time).total_seconds()
-
-        is_auto_submission = time_elapsed == assessment.time_limit if assessment.time_limit else False
-
-        if not is_auto_submission:
-            if assessment.deadline and assessment.deadline < timezone.now():
-                return Response({'error': 'The deadline for this assessment has already passed.'},
-                                status=status.HTTP_400_BAD_REQUEST)
-        # else:
-        #     # Allow auto-submission even if it's slightly past the deadline
-        #     if assessment.deadline and assessment.deadline + timedelta(minutes=2) < timezone.now():
-        #         return Response({'error': 'Auto-submission failed due to excessive delay.'},
-        #                         status=status.HTTP_400_BAD_REQUEST)
-
-    # Check if exam was already taken
     if AssessmentResult.objects.filter(assessment=assessment, user=user).exists():
         return Response({'error': 'Exam was already taken.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    data = request.data
-    answers = data.get('answers', [])
+    assessment_progress = AssessmentProgress.objects.filter(user=user, assessment=assessment).first()
 
+    # Validate time limit and deadline
+    if assessment.deadline or assessment.time_limit:
+        now = timezone.now()
+        if assessment_progress:
+            time_elapsed = (now - assessment_progress.start_time).total_seconds()
+            is_auto_submission = assessment.time_limit and time_elapsed >= assessment.time_limit
+        else:
+            time_elapsed = 0
+            is_auto_submission = False
+
+        if not is_auto_submission and assessment.deadline and now > assessment.deadline:
+            return Response({'error': 'The deadline for this assessment has already passed.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+    answers = request.data.get('answers', [])
     if not answers:
         return Response({'error': 'No answers provided.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Create an assessment result
     assessment_result = AssessmentResult.objects.create(
         assessment=assessment,
+        user=user,
         score=0,
-        time_taken=0,
-        user=user
+        time_taken=request.data.get('total_time_taken_seconds', 0)
     )
 
     assessment_questions = {q.id: q for q in assessment.questions.all()}
+    answer_dict = {a["question_id"]: a for a in answers}
 
     answers_to_create = []
     score = 0
 
-    for question in assessment_questions.values():
-        answer_data = next((a for a in answers if a["question_id"] == question.id), None)
-
+    for question_id, question in assessment_questions.items():
+        answer_data = answer_dict.get(question_id)
         if answer_data:
             chosen_answer = answer_data.get('answer')
             time_spent = answer_data.get('time_spent', 0)
             correct_answer = question.choices[question.correct_answer]
 
             is_correct = chosen_answer == correct_answer
-            if is_correct:
-                score += 1
+            score += int(is_correct)
 
             answers_to_create.append(Answer(
                 assessment_result=assessment_result,
@@ -313,29 +307,26 @@ def submit_assessment(request, assessment_id):
             ))
 
     Answer.objects.bulk_create(answers_to_create)
-
-    assessment_result.score = score
-    assessment_result.time_taken = data.get('total_time_taken_seconds', 0)
-    assessment_result.save()
+    AssessmentResult.objects.filter(id=assessment_result.id).update(score=score)
 
     return Response({'message': 'Exam submitted successfully.'}, status=status.HTTP_201_CREATED)
 
 
 @api_view(['GET'])
 @auth_required("student")
-def get_exam_results(request, assessment_id):
+def get_assessment_result(request, assessment_id):
     user: User = request.user
 
-    # Retrieve the exam object; ensure that the exam belongs to the authenticated user
-    exam = get_object_or_404(Assessment, id=assessment_id)
-    exam_results = get_object_or_404(AssessmentResult, assessment=exam, user=user)
-    answers = Answer.objects.filter(assessment_result=exam_results)
+    result = get_object_or_404(AssessmentResult.objects.prefetch_related(
+        "answers__question__category"
+    ), assessment__id=assessment_id, user=user)
+
+    answers = list(result.answers.all())  # Fetch all answers in one query
 
     overall_correct_answers = 0
     overall_wrong_answers = 0
     category_stats = defaultdict(lambda: {'total_questions': 0, 'correct_answers': 0, 'wrong_answers': 0})
 
-    # Serialize answers
     serialized_answers = []
     for answer in answers:
         category_name = answer.question.category.name
@@ -351,7 +342,7 @@ def get_exam_results(request, assessment_id):
         serialized_answers.append({
             'question_id': answer.question.id,
             'question_text': answer.question.question_text,
-            'choices': list(answer.question.choices.values()),
+            'choices': answer.question.choices if isinstance(answer.question.choices, list) else list(answer.question.choices.values()),
             'correct_answer': answer.question.choices[answer.question.correct_answer],
             'chosen_answer': answer.chosen_answer,
             'is_correct': answer.is_correct,
@@ -361,22 +352,20 @@ def get_exam_results(request, assessment_id):
     categories = [
         {
             'category_name': category_name,
-            'total_questions': stats['total_questions'],
-            'correct_answers': stats['correct_answers'],
-            'wrong_answers': stats['wrong_answers'],
+            **stats  # Expands 'total_questions', 'correct_answers', and 'wrong_answers'
         }
         for category_name, stats in category_stats.items()
     ]
 
     result_data = {
-        'exam_id': exam.id,
-        'student_id': exam_results.user.id,
-        'total_time_taken_seconds': exam_results.time_taken,
-        'score': exam_results.score,
+        'exam_id': result.assessment.id,
+        'student_id': result.user.id,
+        'total_time_taken_seconds': result.time_taken,
+        'score': result.score,
         'categories': categories,
         'overall_correct_answers': overall_correct_answers,
         'overall_wrong_answers': overall_wrong_answers,
-        'total_questions': len(exam.questions.all()),
+        'total_questions': result.assessment.questions.count(),  # Optimized counting
         'answers': serialized_answers,
     }
 
@@ -405,13 +394,9 @@ def get_ability(request):
 @auth_required("student")
 def create_student_quiz(request):
     user: User = request.user
-    print(request.data)
 
     selected_categories = request.data.get('selected_categories', [])
     selected_categories = [int(cat) for cat in selected_categories] if selected_categories else []
-
-    print(selected_categories)
-
     no_of_questions = int(request.data.get('no_of_questions', 5))
     question_source = request.data.get('question_source')
 
@@ -426,7 +411,6 @@ def create_student_quiz(request):
     elif question_source == 'ai_generated':
         return Response({'message': 'AI-generated questions feature has not been implemented yet.'},
                         status=status.HTTP_501_NOT_IMPLEMENTED)
-
     else:
         return Response({'message': 'AI-generated questions feature has not been implemented yet.'},
                         status=status.HTTP_501_NOT_IMPLEMENTED)
@@ -473,11 +457,6 @@ def take_lesson_quiz(request):
     lesson_category = get_object_or_404(Category, name=lesson_name)
 
     all_questions = list(Question.objects.filter(category_id=lesson_category.id))
-
-    if len(all_questions) < no_of_questions:
-        return Response({'error': 'Not enough questions available to generate an exam.'},
-                        status=status.HTTP_404_NOT_FOUND)
-
     selected_questions = random.sample(list(all_questions), no_of_questions)
 
     lesson_quiz = Assessment.objects.create(
@@ -491,7 +470,6 @@ def take_lesson_quiz(request):
     lesson_quiz.selected_categories.set([lesson_category.id])
     lesson_quiz.questions.set(selected_questions)
 
-    # Format the questions and answers to send back to the frontend
     quiz_data = {
         'quiz_id': lesson_quiz.id,
         'questions': [
@@ -513,8 +491,7 @@ def take_lesson_quiz(request):
 def get_class_assessments(request):
     user: User = request.user
 
-    class_owner = Class.objects.get(id=user.enrolled_class.id)
-    assessments = Assessment.objects.filter(class_owner=class_owner).order_by('-created_at')
+    assessments = Assessment.objects.filter(class_owner=user.enrolled_class).order_by('-created_at')
     assessments_data = []
 
     for assessment in assessments:

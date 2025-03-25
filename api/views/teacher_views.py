@@ -9,14 +9,11 @@ from django.utils.dateparse import parse_datetime
 from api.decorators import auth_required
 from django.db.models import Avg
 
+
 @api_view(['GET'])
 @auth_required("teacher")
 def create_initial_assessment(request, class_id):
     user: User = request.user
-
-    class_owner = Class.objects.get(pk=class_id)
-
-    # Create initial assessment
 
     question_ids = [
         '24-A-1', '24-A-2', '24-A-3', '24-A-4', '24-A-5',
@@ -57,6 +54,7 @@ def create_initial_assessment(request, class_id):
     assessment.questions.set(questions)
 
     return Response({"message": "Assessment created"}, status=status.HTTP_201_CREATED)
+
 
 @api_view(['POST'])
 @auth_required("teacher")
@@ -163,10 +161,8 @@ def get_class(request, class_id):
 @api_view(['GET'])
 @auth_required("teacher")
 def view_initial_exam(request, class_id):
-    print("View Initial Exam was called")
     class_owner = Class.objects.get(id=class_id)
 
-    # Retrieve the exam object; ensure that the exam belongs to the authenticated user
     exam = get_object_or_404(Assessment, class_owner=class_owner, is_initial=True)
 
     exam_data = {
@@ -236,27 +232,18 @@ def get_all_questions(request):
 @api_view(['POST'])
 @auth_required("teacher")
 def create_quiz(request, class_id):
-    print("Create Quiz was Called")
-
     question_source = request.data.get('question_source')
     questions = request.data.get('questions')
 
     if not question_source:
         return Response({'error': 'Question source not provided'}, status=status.HTTP_400_BAD_REQUEST)
 
-    class_owner = Class.objects.get(id=class_id)
-    quiz = Assessment.objects.create(name=request.data('name'), class_owner=class_owner)
-
-    selected_categories = []
-    selected_questions = []
+    quiz = Assessment.objects.create(name=request.data('name'), class_owner__id=class_id)
 
     if question_source == "previous_exam":
 
-        for question in questions:
-            question_obj = Question.objects.get(id=question)
-            selected_questions.append(question_obj)
-            selected_categories.append(question_obj.category.id)
-
+        selected_questions = list(Question.objects.filter(id__in=questions))
+        selected_categories = {q.category.id for q in selected_questions}
         quiz.selected_categories.set(selected_categories)
         quiz.questions.set(selected_questions)
         quiz.deadline = parse_datetime(request.data.get('deadline')) if request.data.get('deadline') else None
@@ -279,10 +266,7 @@ def create_quiz(request, class_id):
 @api_view(['GET'])
 @auth_required("teacher")
 def get_class_assessments(request, class_id):
-    print("Get All Quizzes was called")
-    class_obj = Class.objects.get(id=class_id)
-
-    assessments = Assessment.objects.filter(class_owner=class_obj).order_by("-created_at")
+    assessments = Assessment.objects.filter(class_owner__id=class_id).order_by("-created_at")
 
     quizzes_data = []
 
@@ -306,16 +290,11 @@ def get_class_assessments(request, class_id):
 @api_view(['GET'])
 @auth_required("teacher")
 def get_assessment_data(request, assessment_id):
-    assessment = get_object_or_404(Assessment, id=assessment_id)
+    assessment = get_object_or_404(Assessment.objects.prefetch_related("questions"), id=assessment_id)
 
-    questions_data = []
-    for question in assessment.questions.all():
-        questions_data.append({
-            "id": question.id,
-            "question_text": question.question_text,
-            "choices": question.choices,
-            "answer": question.correct_answer
-        })
+    questions_data = list(
+        assessment.questions.values("id", "question_text", "choices", "correct_answer")
+    )
 
     response_data = {
         "id": assessment.id,
@@ -372,20 +351,30 @@ def get_assessment_results(request, assessment_id):
 @api_view(['POST'])
 @auth_required("teacher")
 def update_assessment(request, assessment_id):
-    questions = request.data.get('questions')
+    questions = request.data.get("questions", [])
     assessment = get_object_or_404(Assessment, id=assessment_id)
-    deadline = parse_datetime(request.data.get('deadline')) if request.data.get('deadline') else None
-    assessment.deadline = deadline
-    assessment.save()
 
+    # Update deadline only if provided
+    if "deadline" in request.data:
+        assessment.deadline = parse_datetime(request.data["deadline"]) if request.data["deadline"] else None
+        assessment.save(update_fields=["deadline"])  # Only update the deadline field
+
+    # Fetch all relevant questions in a single query
+    question_ids = [q["id"] for q in questions]
+    existing_questions = {q.id: q for q in Question.objects.filter(id__in=question_ids)}
+
+    updated_questions = []
     for question_data in questions:
-        question = Question.objects.filter(id=question_data["id"]).first()
-
+        question = existing_questions.get(question_data["id"])
         if question:
             question.question_text = question_data["question_text"]
             question.choices = question_data["choices"]
             question.correct_answer = question_data["answer"]
-            question.save()
+            updated_questions.append(question)
+
+    # Bulk update all modified questions in one query
+    if updated_questions:
+        Question.objects.bulk_update(updated_questions, ["question_text", "choices", "correct_answer"])
 
     return Response({"message": "Quiz was successfully updated"}, status=status.HTTP_200_OK)
 
@@ -412,25 +401,21 @@ def delete_assessment(request, quiz_id):
 @api_view(['GET'])
 @auth_required("teacher")
 def get_lessons(request):
-    lessons = Lesson.objects.all()
-
-    lessons_data = []
-
-    for lesson in lessons:
-        lessons_data.append({
-            "id": lesson.id,
-            "name": lesson.name,
-        })
-
+    lessons_data = list(Lesson.objects.values("id", "name"))
     return Response(lessons_data, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
 @auth_required("teacher")
+@api_view(['GET'])
+@auth_required("teacher")
 def get_lesson(request, lesson_id):
-    user: User = request.user
-
-    lesson = get_object_or_404(Lesson, id=lesson_id)
+    lesson = get_object_or_404(
+        Lesson.objects.prefetch_related(
+            "chapters__sections"  # Prefetch sections along with chapters
+        ),
+        id=lesson_id
+    )
 
     if lesson.is_locked:
         return Response(
@@ -438,97 +423,97 @@ def get_lesson(request, lesson_id):
             status=status.HTTP_403_FORBIDDEN
         )
 
-    chapters = lesson.chapters.all().order_by("number")
-    lesson_structure = []
+    # Fetch assessment result in one query (avoid multiple `.exists()` calls)
+    has_completed_assessment = AssessmentResult.objects.filter(assessment__lesson=lesson).exists()
 
-    for chapter in chapters:
-
-        chapter_data = {
+    lesson_structure = [
+        {
             "id": chapter.id,
             "chapter_number": chapter.number,
             "chapter_name": chapter.name,
             "is_main_chapter": chapter.is_main_chapter,
             "is_locked": chapter.is_locked,
+            "structure": (
+                [
+                    {
+                        "section_id": section.id,
+                        "section_number": section.number,
+                        "section_name": section.name,
+                    }
+                    for section in chapter.sections.all()
+                ] + (
+                    [{"type": "quiz", "title": f"Quiz for {chapter.name}"}] if chapter.is_main_chapter else []
+                )
+            ) if not chapter.is_locked else None
         }
+        for chapter in lesson.chapters.all()
+    ]
 
-        if not chapter.is_locked:
-            chapter_data["structure"] = []
-
-            for section in chapter.sections.all():
-                chapter_data["structure"].append({
-                    "section_id": section.id,
-                    "section_number": section.number,
-                    "section_name": section.name,
-                })
-
-            if chapter.is_main_chapter:
-                chapter_data["structure"].append({
-                    "type": "quiz",
-                    "title": f"Quiz for {chapter.name}",
-                })
-
-        lesson_structure.append(chapter_data)
-
+    # Append final lesson quiz info
     lesson_structure.append({
         "type": "quiz",
         "title": "Final Lesson Quiz",
-        "completed": AssessmentResult.objects.filter(assessment__lesson=lesson).exists()
+        "completed": has_completed_assessment
     })
 
-    lesson_data = {
+    return Response({
         "id": lesson.id,
         "lesson_name": lesson.name,
         "structure": lesson_structure,
-    }
-
-    return Response(lesson_data, status=status.HTTP_200_OK)
+    }, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
 @auth_required("teacher")
 def get_chapter(request, lesson_id, chapter_id):
-    chapter = get_object_or_404(Chapter, id=chapter_id)
+    chapter = get_object_or_404(
+        Chapter.objects.prefetch_related("sections"), id=chapter_id
+    )
 
     if chapter.is_locked:
         return Response(
-            {'error': 'Lesson is currently locked. Please wait till the teacher opens it'},
+            {'error': 'Chapter is currently locked. Please wait till the teacher opens it'},
             status=status.HTTP_403_FORBIDDEN
         )
-
-    section_data = []
-
-    for section in chapter.sections.all():
-        section_data.append({
-            "id": section.id,
-            "number": section.number,
-            "title": section.name,
-            "content": section.content,
-        })
 
     chapter_data = {
         "id": chapter.id,
         "chapter_number": chapter.number,
         "chapter_name": chapter.name,
-        "sections": section_data
+        "sections": [
+            {
+                "id": section.id,
+                "number": section.number,
+                "title": section.name,
+                "content": section.content,
+            }
+            for section in chapter.sections.all()
+        ]
     }
 
-    return Response(chapter_data, status=status.HTTP_404_NOT_FOUND)
+    return Response(chapter_data, status=status.HTTP_200_OK)
+
 
 @api_view(['GET'])
 @auth_required("teacher")
 def get_lesson_quiz(request, class_id, lesson_id):
-    students = User.objects.filter(enrolled_class__id=class_id).all()
+    # Fetch students in one query
+    students = User.objects.filter(enrolled_class_id=class_id)
     lesson = get_object_or_404(Lesson, id=lesson_id)
+    assessments = Assessment.objects.filter(lesson=lesson, created_by__in=students)
+    assessment_results = AssessmentResult.objects.filter(assessment__in=assessments).select_related("assessment")
+    assessment_results_lookup = {ar.user_id: ar for ar in assessment_results}
+
     students_data = []
     total_score = 0
+    student_count = students.count()
 
     for student in students:
-
-        assessment = Assessment.objects.filter(lesson=lesson, created_by=student).first()
-        assessment_result = AssessmentResult.objects.filter(assessment=assessment, user=student).last()
+        assessment_result = assessment_results_lookup.get(student.id)
 
         if assessment_result:
-            score_pct = (assessment_result.score / assessment_result.assessment.questions.count()) * 100
+            question_count = assessment_result.assessment.questions.count()
+            score_pct = (assessment_result.score / question_count) * 100 if question_count else 0
             students_data.append({
                 "student_id": student.id,
                 "student_name": student.full_name,
@@ -543,34 +528,35 @@ def get_lesson_quiz(request, class_id, lesson_id):
                 "taken": False,
             })
 
-    average_score = total_score / students.count() if students.exists() else 0
+    average_score = total_score / student_count if student_count > 0 else 0
 
     return Response({
         "lesson_id": lesson_id,
         "lesson_name": lesson.name,
-        "average_percentage": average_score,
+        "average_percentage": round(average_score, 2),
         "students_data": students_data,
     }, status=status.HTTP_200_OK)
-
-
-
 
 
 @api_view(['GET'])
 @auth_required("teacher")
 def get_chapter_quiz(request, class_id, chapter_id):
-    students = User.objects.filter(enrolled_class__id=class_id).all()
-    chapter = get_object_or_404(Chapter, id=chapter_id)
+    chapter = get_object_or_404(Chapter.objects.select_related("lesson"), id=chapter_id)
+    students = User.objects.filter(enrolled_class_id=class_id)
+    assessments = Assessment.objects.filter(chapter=chapter, created_by__in=students)
+    assessment_results = AssessmentResult.objects.filter(assessment__in=assessments).select_related("assessment")
+    assessment_results_lookup = {ar.user_id: ar for ar in assessment_results}
+
     students_data = []
     total_score = 0
+    student_count = students.count()
 
     for student in students:
+        assessment_result = assessment_results_lookup.get(student.id)
 
-        assessment = Assessment.objects.filter(chapter=chapter, created_by=student).first()
-        assessment_result = AssessmentResult.objects.filter(assessment=assessment, user=student).last()
-
-        if assessment_result.exists():
-            score_pct = (assessment_result.score / assessment_result.assessment.questions.count()) * 100
+        if assessment_result:
+            question_count = assessment_result.assessment.questions.count()
+            score_pct = (assessment_result.score / question_count) * 100 if question_count else 0
 
             students_data.append({
                 "student_id": student.id,
@@ -586,12 +572,12 @@ def get_chapter_quiz(request, class_id, chapter_id):
                 "taken": False,
             })
 
-    average_score = total_score / students.count() if students.exists() else 0
+    average_score = total_score / student_count if student_count > 0 else 0
 
     return Response({
-        "chapter_id": chapter_id,
+        "chapter_id": chapter.id,
         "chapter_name": chapter.name,
         "lesson_name": chapter.lesson.name,
-        "average_percentage": average_score,
+        "average_percentage": round(average_score, 2),
         "students_data": students_data,
     }, status=status.HTTP_200_OK)

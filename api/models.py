@@ -46,7 +46,7 @@ class UserAbility(models.Model):
         unique_together = (('user', 'category'),)
 
     def __str__(self):
-        return f"{self.user.email} - {self.category.name} - {self.ability_level}"
+        return f"{self.user.email} - {self.category.name} - {self.irt_ability}"
 
 
 class Question(models.Model):

@@ -107,6 +107,21 @@ def upload_lessons_from_sheet(lesson_spreadsheet_id, lesson_range, chapter_sprea
     chapter_data = get_sheet_data(chapter_spreadsheet_id, chapter_range)
     section_data = get_sheet_data(section_spreadsheet_id, section_range)
 
+    categories = [
+        'Basic Theory',
+        'Computer System',
+        'Technology Element',
+        'Development Technology',
+        'Project Management',
+        'Service Management',
+        'Business Strategy',
+        'System Strategy',
+        'Corporate and Legal Affairs',
+    ]
+
+    for category in categories:
+        Category.objects.get_or_create(name=category)
+
     if not lesson_data or not chapter_data or not section_data:
         print("Missing data from one or more sheets.")
         return
