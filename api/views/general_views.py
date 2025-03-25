@@ -92,7 +92,7 @@ def login_user(request):
             value=auth_response.session.access_token,
             httponly=True,  # Prevent JavaScript access
             secure=True,
-            samesite='Lax'
+            samesite='None'
         )
 
         response.set_cookie(
@@ -100,7 +100,7 @@ def login_user(request):
             value=auth_response.session.refresh_token,
             httponly=True,
             secure=True,
-            samesite='Lax'
+            samesite='None'
         )
 
         return response
@@ -141,7 +141,7 @@ def refresh(request):
             value=new_access_token,
             httponly=True,
             secure=True,
-            samesite='Lax'
+            samesite='None'
         )
 
         # Set new refresh token
@@ -150,7 +150,7 @@ def refresh(request):
             value=new_refresh_token,
             httponly=True,
             secure=True,
-            samesite='Lax'
+            samesite='None'
         )
 
         return response
