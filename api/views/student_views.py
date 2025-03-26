@@ -43,7 +43,6 @@ def get_class(request):
         else:
             total_chapters = lesson.chapters.count()
             completed_chapters = progress.current_chapter.number
-            print("Progress", total_chapters, completed_chapters)
             progress_percentage = (completed_chapters / total_chapters) * 100 if total_chapters > 0 else 0.0
 
             lesson_data.append({
@@ -309,7 +308,7 @@ def submit_assessment(request, assessment_id):
     Answer.objects.bulk_create(answers_to_create)
     AssessmentResult.objects.filter(id=assessment_result.id).update(score=score)
 
-    return Response({'message': 'Exam submitted successfully.'}, status=status.HTTP_201_CREATED)
+    return Response({'message': 'Assessment was submitted successfully'}, status=status.HTTP_201_CREATED)
 
 
 @api_view(['GET'])
@@ -321,7 +320,7 @@ def get_assessment_result(request, assessment_id):
         "answers__question__category"
     ), assessment__id=assessment_id, user=user)
 
-    answers = list(result.answers.all())  # Fetch all answers in one query
+    answers = list(result.answers.all())
 
     overall_correct_answers = 0
     overall_wrong_answers = 0
@@ -382,7 +381,7 @@ def get_ability(request):
     # Retrieve stored abilities
     user_abilities = UserAbility.objects.filter(user_id=user.id)
     stored_abilities = {
-        user_ability.category.name: user_ability.ability_level for user_ability in user_abilities
+        user_ability.category.name: user_ability.irt_ability for user_ability in user_abilities
     }
 
     return Response({
@@ -534,10 +533,7 @@ def get_history(request):
         selected_categories = result.assessment.selected_categories.all()
         categories = []
 
-        print(selected_categories)
-
         for category in selected_categories:
-            # Get answers related to the category
             answers = Answer.objects.filter(
                 assessment_result=result,
                 question__category=category

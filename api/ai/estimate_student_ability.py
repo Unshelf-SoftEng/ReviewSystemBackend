@@ -46,8 +46,6 @@ def estimate_theta_for_answers(answers):
 def estimate_ability_irt(user_id):
     """Estimate student ability (theta) per category using the 3PL model and MLE."""
 
-    print(user_id)
-
     user = User.objects.get(pk=user_id)
     all_answers = Answer.objects.filter(assessment_result__user=user)
 
@@ -77,7 +75,8 @@ def estimate_ability_irt(user_id):
 
         if category_obj:
             user_ability = UserAbility.objects.get(category=category_obj, user=user)
-            user_ability.ability_level = ability_level
+            print('Created User Ability')
+            user_ability.irt_ability = ability_level
             user_ability.save()
 
 

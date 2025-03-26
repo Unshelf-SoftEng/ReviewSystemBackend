@@ -26,7 +26,7 @@ class User(models.Model):
         return f"{self.first_name} {self.last_name}"
 
     def __str__(self):
-        return self.email
+        return self.full_name
 
 
 class Category(models.Model):
@@ -46,7 +46,7 @@ class UserAbility(models.Model):
         unique_together = (('user', 'category'),)
 
     def __str__(self):
-        return f"{self.user.email} - {self.category.name} - {self.irt_ability}"
+        return f"{self.user.full_name} - {self.category.name} - {self.irt_ability}"
 
 
 class Question(models.Model):
@@ -105,7 +105,7 @@ class Assessment(models.Model):
     question_source = models.CharField(max_length=50, choices=QUESTION_SOURCE_CHOICES, default='previous_exam')
 
     def __str__(self):
-        return f"{self.type.capitalize()} - {self.name or 'Unnamed'}"
+        return self.name
 
 
 class AssessmentProgress(models.Model):
@@ -121,7 +121,7 @@ class AssessmentResult(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
 
     def __str__(self):
-        return f'{self.user.full_name} - {self.assessment} - {self.score}'
+        return f'{self.user} scored {self.score} on {self.assessment}'
 
 
 class Answer(models.Model):
@@ -168,7 +168,7 @@ class Chapter(models.Model):
         ordering = ['number']
 
     def __str__(self):
-        return f"{self.lesson.name} - {self.number}. {self.name}"
+        return f"{self.lesson} - Chapter {self.number}. {self.name}"
 
 
 class Section(models.Model):

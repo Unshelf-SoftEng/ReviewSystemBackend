@@ -29,7 +29,7 @@ def auth_required(*allowed_roles):
                 user_data = supabase_client.auth.get_user(jwt=token)
             except Exception as e:
 
-                print(f"Error fetching user data: {str(e)}")  # Log the error
+                print(f"Error fetching user data: {str(e)}")
 
                 if refresh_token:
                     try:

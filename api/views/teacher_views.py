@@ -179,6 +179,10 @@ def open_initial_exam(request, class_id):
     deadline = request.data['deadline']
     class_owner = Class.objects.get(id=class_id)
     exam = Assessment.objects.get(class_owner=class_owner, is_initial=True)
+
+    if exam.deadline is not None:
+        return Response({'message': 'Initial Exam is already open.'}, status=status.HTTP_400_BAD_REQUEST)
+
     exam.deadline = deadline
     exam.save()
 
@@ -194,7 +198,7 @@ def get_student_data(request, student_id):
         return Response({"error": "Student ID specified is not a student"}, status=status.HTTP_403_FORBIDDEN)
 
     user_ability = UserAbility.objects.filter(user_id=student_id)
-    stored_abilities = {user_ability.category.name: user_ability.ability_level for user_ability in user_ability}
+    stored_abilities = {user_ability.category.name: user_ability.irt_ability for user_ability in user_ability}
 
     assessment_results = AssessmentResult.objects.filter(user=student)
 
@@ -238,7 +242,15 @@ def create_quiz(request, class_id):
     if not question_source:
         return Response({'error': 'Question source not provided'}, status=status.HTTP_400_BAD_REQUEST)
 
-    quiz = Assessment.objects.create(name=request.data('name'), class_owner__id=class_id)
+    try:
+        class_obj = Class.objects.get(pk=class_id)
+    except Class.DoesNotExist:
+        return Response({'error': 'Class not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    quiz = Assessment.objects.create(
+        name=request.data.get('name'),
+        class_owner=class_obj
+    )
 
     if question_source == "previous_exam":
 
@@ -247,7 +259,7 @@ def create_quiz(request, class_id):
         quiz.selected_categories.set(selected_categories)
         quiz.questions.set(selected_questions)
         quiz.deadline = parse_datetime(request.data.get('deadline')) if request.data.get('deadline') else None
-        quiz.no_of_questions = data.get('no_of_questions')
+        quiz.no_of_questions = request.data.get('no_of_questions')
         quiz.type = "quiz"
         quiz.status = "created"
         quiz.source = "teacher_generated"
@@ -407,12 +419,10 @@ def get_lessons(request):
 
 @api_view(['GET'])
 @auth_required("teacher")
-@api_view(['GET'])
-@auth_required("teacher")
 def get_lesson(request, lesson_id):
     lesson = get_object_or_404(
         Lesson.objects.prefetch_related(
-            "chapters__sections"  # Prefetch sections along with chapters
+            "chapters__sections"
         ),
         id=lesson_id
     )

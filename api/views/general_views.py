@@ -74,9 +74,6 @@ def login_user(request):
         first_name = user.first_name
         last_name = user.last_name
 
-        print("Access Token:", auth_response.session.access_token)
-        print("Refresh Token:", auth_response.session.refresh_token)
-
         # Create response
         response = Response({
             'message': 'Login successful',
@@ -112,70 +109,12 @@ def login_user(request):
 
 
 @api_view(['POST'])
-def refresh(request):
-    refresh_token = request.COOKIES.get('refresh_token')
-
-    if not refresh_token:
-        return Response({'error': 'Refresh token missing'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    supabase = get_supabase_client()
-
-    try:
-        session_data = supabase.auth.refresh_session(refresh_token=refresh_token)
-
-        print(session_data)
-
-        if not session_data or not session_data.session:
-            return Response({'error': 'Invalid or expired refresh token'}, status=status.HTTP_401_UNAUTHORIZED)
-
-        # Extract new tokens
-        new_access_token = session_data.session.access_token
-        new_refresh_token = session_data.session.refresh_token  # MUST BE UPDATED
-
-        response = Response({'message': 'Token refreshed'}, status=status.HTTP_200_OK)
-
-        # Set new access token
-        response.set_cookie(
-            key='jwt_token',
-            value=new_access_token,
-            httponly=True,
-            secure=True,
-            samesite='None'
-        )
-
-        # Set new refresh token
-        response.set_cookie(
-            key='refresh_token',
-            value=new_refresh_token,
-            httponly=True,
-            secure=True,
-            samesite='None'
-        )
-
-        return response
-
-    except Exception as e:
-        return Response({'error': 'Invalid or expired refresh token'}, status=status.HTTP_401_UNAUTHORIZED)
-
-@api_view(['POST'])
 def logout_user(request):
     response = Response({'message': 'Logout successful'}, status=status.HTTP_200_OK)
-
-    # Remove cookies
     response.delete_cookie('jwt_token')
     response.delete_cookie('refresh_token')
 
     return response
-
-@api_view(['POST'])
-@auth_required()
-def reset_password(request):
-    data = request.data
-    email = data.get('email')
-    get_supabase_client().reset_password_email(
-        email=email,
-        options={'redirect_to': 'https://localhost:3000/update_password/'}
-    )
 
 
 @api_view(['POST'])
@@ -218,3 +157,13 @@ def get_user_details(request):
     }
 
     return Response(user_data, status=status.HTTP_200_OK)
+
+@api_view(['POST'])
+@auth_required()
+def reset_password(request):
+    data = request.data
+    email = data.get('email')
+    get_supabase_client().reset_password_email(
+        email=email,
+        options={'redirect_to': 'https://localhost:3000/update_password/'}
+    )
