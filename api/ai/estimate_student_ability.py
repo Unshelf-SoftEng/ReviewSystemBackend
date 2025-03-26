@@ -75,7 +75,6 @@ def estimate_ability_irt(user_id):
 
         if category_obj:
             user_ability = UserAbility.objects.get(category=category_obj, user=user)
-            print('Created User Ability')
             user_ability.irt_ability = ability_level
             user_ability.save()
 
@@ -84,7 +83,7 @@ def estimate_ability_elo(user_id):
     """
     Estimate and update student ability using the Elo rating system.
     """
-    k = 32  # Learning rate (can be tuned based on system performance)
+    k = 32 # Learning rate (can be tuned based on system performance)
     user = User.objects.get(pk=user_id)
     assessment_results = AssessmentResult.objects.filter(user=user).order_by('id')
 
@@ -92,7 +91,7 @@ def estimate_ability_elo(user_id):
         return {"error": "Student has not taken any assessments."}
 
     for result in assessment_results:
-        categories = result.assessment.selected_categories
+        categories = result.assessment.selected_categories.all()
 
         for category in categories:
             user_ability, created = UserAbility.objects.get_or_create(
@@ -104,18 +103,28 @@ def estimate_ability_elo(user_id):
                 }
             )
 
-            # Calculate expected score
-            total_difficulty = 0
-            for question in result.assessment.selected_questions:
-                total_difficulty += question.difficulty
+            answers = result.answers.filter(question__category=category)
 
-            avg_difficulty = total_difficulty / len(result.assessment.selected_questions)
-            expected_score = 1 / (1 + 10 ** ((avg_difficulty - user_ability.ability_level) / 400))
+            for answer in answers:
+                question_difficulty = answer.question.difficulty
 
-            # Normalize the actual performance (score percentage)
-            actual_score = result.score / 100.0
+                # Calculate expected score for this question
+                expected_score = 1 / (1 + 10 ** ((question_difficulty - user_ability.elo_ability) / 400))
 
-            # Update Elo rating
-            new_ability = user_ability.ability_level + k * (actual_score - expected_score)
-            user_ability.ability_level = new_ability
+                # Determine actual score (assuming 1 for correct, 0 for incorrect)
+                actual_score = 1 if answer.is_correct else 0
+
+                # Update Elo ability
+                if user_ability.elo_ability is None:
+                    user_ability.elo_ability = 1000
+
+                prev_ability = user_ability.elo_ability
+
+                user_ability.elo_ability += k * (actual_score - expected_score)
+
+                new_ability = user_ability.elo_ability
+
+                print(f"Category: {category}, Prev Ability: {prev_ability}, New Ability: {new_ability}")
+
+            # Save updated ability after processing all questions
             user_ability.save()

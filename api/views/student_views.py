@@ -6,7 +6,7 @@ from django.utils import timezone
 from ..models import User, Question, Assessment, Answer, AssessmentResult, UserAbility, Category, Lesson, \
     LessonProgress, Class, AssessmentProgress, Chapter, Section
 from collections import defaultdict
-from ..ai.estimate_student_ability import estimate_ability_irt
+from ..ai.estimate_student_ability import estimate_ability_irt, estimate_ability_elo
 from django.shortcuts import get_object_or_404
 from ..decorators import auth_required
 
@@ -376,16 +376,22 @@ def get_assessment_result(request, assessment_id):
 def get_ability(request):
     user: User = request.user
 
-    estimate_ability_irt(user.id)
+    # estimate_ability_irt(user.id)
+    estimate_ability_elo(user.id)
 
     # Retrieve stored abilities
     user_abilities = UserAbility.objects.filter(user_id=user.id)
-    stored_abilities = {
+    irt_abilities = {
         user_ability.category.name: user_ability.irt_ability for user_ability in user_abilities
     }
 
+    elo_abilities = {
+        user_ability.category.name: user_ability.elo_ability for user_ability in user_abilities
+    }
+
     return Response({
-        "abilities": stored_abilities,
+        "abilities": irt_abilities,
+        "elo_abilities": elo_abilities
     }, status=status.HTTP_200_OK)
 
 
