@@ -171,12 +171,6 @@ def reset_password(request):
 @api_view(['GET'])
 @auth_required()
 def auth_user(request):
-    user: User = request.user
-
-    return Response({
-        'id': user.id,
-        'first_name': user.first_name,
-        'last_name': user.last_name,
-        'email': user.email,
-        'role': user.role,
-    }, status=status.HTTP_200_OK)
+    if request.user.is_authenticated:
+        return Response({"id": request.user.id, "role": request.user.role, "first_name": request.user.first_name})
+    return Response({"error": "Unauthorized"}, status=401)
