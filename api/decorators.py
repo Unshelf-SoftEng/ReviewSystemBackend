@@ -10,15 +10,13 @@ def auth_required(*allowed_roles):
     """
     Decorator to authenticate users.
     - If no roles are specified, only authentication is required.
-    - If roles are specified, the user must have one of the allowed roles.
+    - If roles are specified, the user must be of the allowed roles.
     """
-
     def decorator(view_func):
         @wraps(view_func)
         def wrapped_view(request, *args, **kwargs):
             supabase_client = get_supabase_client()
 
-            # Retrieve tokens from cookies
             token = request.COOKIES.get('jwt_token')
             refresh_token = request.COOKIES.get('refresh_token')
 
@@ -28,12 +26,17 @@ def auth_required(*allowed_roles):
             try:
                 user_data = supabase_client.auth.get_user(jwt=token)
             except Exception as e:
-
-                print(f"Error fetching user data: {str(e)}")
-
                 if refresh_token:
+
+                    print('Refreshing the token')
+
                     try:
+
                         new_session = supabase_client.auth.refresh_session(refresh_token=refresh_token)
+
+                        if not new_session or not new_session.session:
+                            raise Exception("Failed to refresh session")
+
                         new_access_token = new_session.session.access_token
                         new_refresh_token = new_session.session.refresh_token
                         user_data = supabase_client.auth.get_user(jwt=new_access_token)
@@ -58,11 +61,11 @@ def auth_required(*allowed_roles):
                         return response
 
                     except Exception as e:
-                        print(f"Here we have Error fetching user data: {str(e)}")  # Log the error
-
+                        print(f"Here we have Error fetching user data: {str(e)}")
                         return Response({'error': 'Invalid or expired refresh token. Please log in again.'},
                                         status=status.HTTP_401_UNAUTHORIZED)
                 else:
+                    print(f"There is no refresh token found")
                     return Response({'error': 'Invalid or expired token. Please log in again.'},
                                     status=status.HTTP_401_UNAUTHORIZED)
 

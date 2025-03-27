@@ -140,8 +140,11 @@ def take_initial_exam(request):
     if not exam:
         return Response({"error": "Can't find initial exam"}, status=status.HTTP_404_NOT_FOUND)
 
-    if not exam.deadline or exam.deadline < timezone.now():
-        return Response({'error': 'Exam is not available.'}, status=status.HTTP_400_BAD_REQUEST)
+    if not exam.deadline:
+        return Response({'error': 'Exam is not yet open'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if exam.deadline < timezone.now():
+        return Response({'error': 'Exam deadline has already passed'})
 
     if AssessmentResult.objects.filter(assessment=exam, user=user).exists():
         return Response({'error': 'Student has already taken the exam.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -376,7 +379,7 @@ def get_assessment_result(request, assessment_id):
 def get_ability(request):
     user: User = request.user
 
-    # estimate_ability_irt(user.id)
+    estimate_ability_irt(user.id)
     estimate_ability_elo(user.id)
 
     # Retrieve stored abilities

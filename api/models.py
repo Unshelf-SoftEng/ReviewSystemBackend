@@ -96,7 +96,6 @@ class Assessment(models.Model):
     selected_categories = models.ManyToManyField(Category, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
-    taken_at = models.DateTimeField(auto_now=True)
     time_limit = models.IntegerField(default=0)
     deadline = models.DateTimeField(null=True, blank=True)
     is_initial = models.BooleanField(default=False)
