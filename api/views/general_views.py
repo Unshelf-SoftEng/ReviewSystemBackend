@@ -62,7 +62,6 @@ def login_user(request):
     supabase = get_supabase_client()
 
     try:
-        # Authenticate user with Supabase
         auth_response = supabase.auth.sign_in_with_password({
             'email': email,
             'password': password
@@ -81,13 +80,15 @@ def login_user(request):
             'last_name': last_name
         }, status=status.HTTP_200_OK)
 
+        print("Refresh token", auth_response.session.refresh_token)
+
         response.set_cookie(
             key='jwt_token',
             value=auth_response.session.access_token,
             httponly=True,
             secure=True,
             samesite='None',
-            max_age=30
+            max_age=3600
         )
 
         response.set_cookie(
