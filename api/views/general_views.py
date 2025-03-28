@@ -88,7 +88,8 @@ def login_user(request):
             value=auth_response.session.access_token,
             httponly=True,  # Prevent JavaScript access
             secure=True,
-            samesite='None'
+            samesite='None',
+            max_age=30
         )
 
         response.set_cookie(
