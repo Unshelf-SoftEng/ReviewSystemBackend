@@ -2,7 +2,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from api.utils.supabase_client import get_supabase_client
-from api.models import User, Lesson, Category, UserAbility
+from api.models import User, Category, UserAbility
 from api.decorators import auth_required
 
 
@@ -43,8 +43,6 @@ def register_user(request):
                 for category in categories:
                     UserAbility.objects.create(user=new_user, category=category, elo_ability=1000, irt_ability=0)
 
-                lessons = Lesson.objects.all()
-
             return Response({'message': 'User registered successfully!'}, status=status.HTTP_201_CREATED)
         except Exception as e:
 
@@ -79,8 +77,6 @@ def login_user(request):
             'first_name': first_name,
             'last_name': last_name
         }, status=status.HTTP_200_OK)
-
-        print("Refresh token", auth_response.session.refresh_token)
 
         response.set_cookie(
             key='access_token',
@@ -158,6 +154,7 @@ def get_user_details(request):
 
     return Response(user_data, status=status.HTTP_200_OK)
 
+
 @api_view(['POST'])
 @auth_required()
 def reset_password(request):
@@ -167,6 +164,7 @@ def reset_password(request):
         email=email,
         options={'redirect_to': 'https://localhost:3000/update_password/'}
     )
+
 
 @api_view(['GET'])
 @auth_required()

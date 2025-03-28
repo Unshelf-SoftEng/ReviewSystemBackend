@@ -3,12 +3,12 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 import random
 from django.utils import timezone
-from ..models import User, Question, Assessment, Answer, AssessmentResult, UserAbility, Category, Lesson, \
+from api.models import User, Question, Assessment, Answer, AssessmentResult, UserAbility, Category, Lesson, \
     LessonProgress, Class, AssessmentProgress, Chapter, Section
 from collections import defaultdict
-from ..ai.estimate_student_ability import estimate_ability_irt, estimate_ability_elo
+from api.ai.estimate_student_ability import estimate_ability_irt, estimate_ability_elo
 from django.shortcuts import get_object_or_404
-from ..decorators import auth_required
+from api.decorators import auth_required
 
 
 @api_view(['GET'])

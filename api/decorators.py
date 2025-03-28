@@ -66,7 +66,7 @@ def auth_required(*allowed_roles):
 
                         # Set new tokens in cookies
                         response.set_cookie(
-                            key='jwt_token',
+                            key='access_token',
                             value=new_access_token,
                             httponly=True,
                             secure=True,
