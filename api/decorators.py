@@ -43,7 +43,7 @@ def auth_required(*allowed_roles):
                     value=new_access_token,
                     httponly=True,
                     secure=True,
-                    samesite='Lax',
+                    samesite='None',
                     max_age=3600,
                 )
 
@@ -52,7 +52,8 @@ def auth_required(*allowed_roles):
                     value=new_refresh_token,
                     httponly=True,
                     secure=True,
-                    samesite='Lax'
+                    samesite='None',
+                    max_age=2592000,
                 )
 
                 return response

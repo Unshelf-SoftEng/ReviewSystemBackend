@@ -86,10 +86,10 @@ def login_user(request):
         response.set_cookie(
             key='jwt_token',
             value=auth_response.session.access_token,
-            httponly=True,  # Prevent JavaScript access
+            httponly=True,
             secure=True,
             samesite='None',
-            max_age=30
+            max_age=3600
         )
 
         response.set_cookie(
@@ -97,7 +97,8 @@ def login_user(request):
             value=auth_response.session.refresh_token,
             httponly=True,
             secure=True,
-            samesite='None'
+            samesite='None',
+            max_age=2592000,
         )
 
         return response
