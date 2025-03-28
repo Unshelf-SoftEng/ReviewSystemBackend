@@ -208,9 +208,22 @@ def reset_password(request):
     )
 
 
+
 @api_view(['GET'])
-@auth_required()
 def auth_user(request):
-    if request.user.is_authenticated:
-        return Response({"id": request.user.id, "role": request.user.role, "first_name": request.user.first_name})
+    if hasattr(request, 'user') and request.user.is_authenticated:
+        try:
+            return Response({
+                "id": request.user.id,
+                "role": request.user.role,  
+                "first_name": request.user.first_name,
+                "last_name": request.user.last_name
+            })
+        except AttributeError as e:
+            print(f"User attribute error: {e}")
+            return Response({
+                "error": "User data incomplete",
+                "details": str(e)
+            }, status=500)
+    
     return Response({"error": "Unauthorized"}, status=401)
