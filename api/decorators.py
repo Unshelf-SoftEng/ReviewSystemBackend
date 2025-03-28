@@ -12,7 +12,7 @@ def auth_required(*allowed_roles):
         @wraps(view_func)
         def wrapped_view(request, *args, **kwargs):
             supabase_client = get_supabase_client()
-            token = request.COOKIES.get('jwt_token')
+            token = request.COOKIES.get('access_token')
             refresh_token = request.COOKIES.get('refresh_token')
 
             # If no tokens at all
@@ -38,14 +38,11 @@ def auth_required(*allowed_roles):
                         print('JWT Token Error', e)
                         if not refresh_token:
                             raise
+                else:
+                    print("JWT Token is not available")
 
-                print("JWT Token is not available")
-
-                # If we get here, we need to refresh the session
                 if refresh_token:
-
                     print("Refresh token", refresh_token)
-
                     try:
                         new_session = supabase_client.auth.refresh_session(refresh_token=refresh_token)
 
@@ -81,7 +78,7 @@ def auth_required(*allowed_roles):
                             httponly=True,
                             secure=True,
                             samesite='None',
-                            max_age=2592000,  # 30 days
+                            max_age=2592000,
                         )
                         return response
                     except AuthApiError as e:
