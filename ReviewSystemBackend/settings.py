@@ -132,6 +132,9 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 CORS_ALLOWED_ORIGIN_REGEXES = [
         r"^http://localhost:\d+$",
         r"^http://127\.0\.0\.1:\d+$",
+        r"^https://nits-adaptive-nine\.vercel\.app$",  # Production deployment
+        r"^https://nits-adaptive-git-[a-z0-9-]+-ymsflores-projects\.vercel\.app$",  # Pre-production deployments
+        r"^https://nits-adaptive-[a-z0-9-]+\.vercel\.app$", # Optional: Match any Vercel preview URL 
 ]
 
 CORS_ALLOW_CREDENTIALS = True
