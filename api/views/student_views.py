@@ -438,7 +438,7 @@ def submit_assessment(request, assessment_id):
     if assessment is None:
         return Response({'error': 'Assessment does not exist'}, status=status.HTTP_404_NOT_FOUND)
 
-    if assessment.source == 'student_generated' and assessment.created_by != user:
+    if assessment.source == 'student_initiated' and assessment.created_by != user:
         return Response({'error': 'You are not allowed to submit answers on this assessment'},
                         status=status.HTTP_403_FORBIDDEN)
     else:
