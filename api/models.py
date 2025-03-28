@@ -62,7 +62,8 @@ class Question(models.Model):
     question_text = models.TextField()
     image_url = models.TextField(blank=True, null=True)
     category = models.ForeignKey(Category, related_name='questions', on_delete=models.CASCADE)
-    subcategory = models.ForeignKey(Subcategory, related_name='questions', on_delete=models.CASCADE, blank=True, null=True)
+    subcategory = models.ForeignKey(Subcategory, related_name='questions', on_delete=models.CASCADE, blank=True,
+                                    null=True)
     difficulty = models.FloatField(default=0.0)
     discrimination = models.FloatField(default=1.0)
     guessing = models.FloatField(default=0.0)
@@ -126,8 +127,9 @@ class AssessmentProgress(models.Model):
 class AssessmentResult(models.Model):
     assessment = models.ForeignKey(Assessment, on_delete=models.CASCADE)
     score = models.IntegerField(default=0)
-    time_taken = models.IntegerField(default=0)
+    time_taken = models.IntegerField(default=0, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f'{self.user} scored {self.score} on {self.assessment}'
@@ -135,8 +137,8 @@ class AssessmentResult(models.Model):
 
 class Answer(models.Model):
     assessment_result = models.ForeignKey(AssessmentResult, related_name='answers', on_delete=models.CASCADE)
-    question = models.ForeignKey(Question, related_name='question', on_delete=models.CASCADE)
-    time_spent = models.IntegerField(default=0)
+    question = models.ForeignKey(Question, related_name='answers', on_delete=models.CASCADE)
+    time_spent = models.IntegerField(default=0, editable=False)
     chosen_answer = models.TextField()
     is_correct = models.BooleanField(default=False)
 

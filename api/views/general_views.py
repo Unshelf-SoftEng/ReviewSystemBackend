@@ -4,51 +4,93 @@ from rest_framework.response import Response
 from api.utils.supabase_client import get_supabase_client
 from api.models import User, Category, UserAbility
 from api.decorators import auth_required
+from django.db import transaction
+
+
+@api_view(['POST'])
+def register_teacher(request):
+    data = request.data
+    email = data.get('email')
+    password = data.get('password')
+    first_name = data.get('first_name')
+    last_name = data.get('last_name')
+    supabase_client = get_supabase_client()
+
+    if User.objects.filter(email=email).exists():
+        return Response({'error': 'Email is already registered'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        auth_response = supabase_client.auth.sign_up({
+            'email': email,
+            'password': password,
+            'options': {
+                'email_redirect_to': 'https://nits-adaptive-nine.vercel.app/',
+            }
+        })
+
+        print("Supabase Auth Response:", auth_response)
+        supabase_user = getattr(auth_response, 'user', None)
+        if not supabase_user or not supabase_user.id:
+            return Response({'error': 'User registration failed on Supabase'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Step 4: Save the user in Django within a transaction
+        with transaction.atomic():
+            new_user = User.objects.create(
+                supabase_user_id=supabase_user.id,
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
+                role='teacher'
+            )
+
+        return Response({'message': 'User registered successfully!'}, status=status.HTTP_201_CREATED)
+
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['POST'])
 def register_user(request):
-    if request.method == 'POST':
-        data = request.data
-        email = data.get('email')
-        password = data.get('password')
-        first_name = data.get('first_name')
-        last_name = data.get('last_name')
-        role = data.get('role')
+    data = request.data
+    email = data.get('email')
+    password = data.get('password')
+    first_name = data.get('first_name')
+    last_name = data.get('last_name')
+    supabase_client = get_supabase_client()
 
-        supabase_client = get_supabase_client()
+    if User.objects.filter(email=email).exists():
+        return Response({'error': 'Email is already registered'}, status=status.HTTP_400_BAD_REQUEST)
 
-        try:
+    try:
+        auth_response = supabase_client.auth.sign_up({
+            'email': email,
+            'password': password,
+            'options': {
+                'email_redirect_to': 'https://nits-adaptive-nine.vercel.app/',
+            }
+        })
 
-            auth_response = supabase_client.auth.sign_up({
-                'email': email,
-                'password': password,
-                'options': {
-                    'email_redirect_to': 'https://localhost:3000/login/',
-                }
-            })
+        print("Supabase Auth Response:", auth_response)
+        supabase_user = getattr(auth_response, 'user', None)
+        if not supabase_user or not supabase_user.id:
+            return Response({'error': 'User registration failed on Supabase'}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Store user in the local database (PostgresSQL)
-            new_user = User(
-                supabase_user_id=auth_response.user.id,
+        with transaction.atomic():
+            new_user = User.objects.create(
+                supabase_user_id=supabase_user.id,
                 email=email,
                 first_name=first_name,
                 last_name=last_name,
-                role=role,
+                role='student'
             )
-            new_user.save()
+            categories = Category.objects.all()
+            for category in categories:
+                UserAbility.objects.create(user=new_user, category=category, elo_ability=1000, irt_ability=0)
 
-            if role == 'student':
-                categories = Category.objects.all()
-                for category in categories:
-                    UserAbility.objects.create(user=new_user, category=category, elo_ability=1000, irt_ability=0)
+        return Response({'message': 'User registered successfully!'}, status=status.HTTP_201_CREATED)
 
-            return Response({'message': 'User registered successfully!'}, status=status.HTTP_201_CREATED)
-        except Exception as e:
-
-            if "already exists" in str(e).lower():
-                return Response({'error': 'Email already registered'}, status=status.HTTP_400_BAD_REQUEST)
-            return Response({'error': f'Error: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['POST'])

@@ -15,7 +15,6 @@ def auth_required(*allowed_roles):
             token = request.COOKIES.get('access_token')
             refresh_token = request.COOKIES.get('refresh_token')
 
-            # If no tokens at all
             if not token and not refresh_token:
                 return Response({'error': 'Authentication required. Please log in again'},
                                 status=status.HTTP_401_UNAUTHORIZED)

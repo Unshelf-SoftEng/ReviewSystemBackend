@@ -87,7 +87,7 @@ def create_class(request):
     assessment = Assessment.objects.create(
         name='Initial Assessment',
         class_owner=new_class,
-        type='Exam',
+        type='exam',
         question_source='previous_exam',
         source='admin_generated',
         time_limit=8100,
@@ -236,7 +236,7 @@ def get_all_questions(request):
 def create_assessment(request, class_id):
     question_source = request.data.get('question_source')
     questions = request.data.get('questions')
-    quiz_type = request.data.get('type', 'Quiz') or 'Quiz'
+    assessment_type = request.data.get('type', 'quiz') or 'quiz'
 
     if not question_source:
         return Response({'error': 'Question source not provided'}, status=status.HTTP_400_BAD_REQUEST)
@@ -246,7 +246,7 @@ def create_assessment(request, class_id):
     except Class.DoesNotExist:
         return Response({'error': 'Class not found'}, status=status.HTTP_404_NOT_FOUND)
 
-    quiz = Assessment.objects.create(
+    assessment = Assessment.objects.create(
         name=request.data.get('name'),
         class_owner=class_obj
     )
@@ -255,14 +255,13 @@ def create_assessment(request, class_id):
 
         selected_questions = list(Question.objects.filter(id__in=questions))
         selected_categories = {q.category.id for q in selected_questions}
-        quiz.selected_categories.set(selected_categories)
-        quiz.questions.set(selected_questions)
-        quiz.deadline = parse_datetime(request.data.get('deadline')) if request.data.get('deadline') else None
-        quiz.no_of_questions = request.data.get('no_of_questions')
-        quiz.type = quiz_type
-        quiz.status = "created"
-        quiz.source = "teacher_generated"
-        quiz.save()
+        assessment.selected_categories.set(selected_categories)
+        assessment.questions.set(selected_questions)
+        assessment.deadline = parse_datetime(request.data.get('deadline')) if request.data.get('deadline') else None
+        assessment.no_of_questions = request.data.get('no_of_questions')
+        assessment.type = assessment_type
+        assessment.source = "teacher_generated"
+        assessment.save()
 
     elif question_source == "mixed":
         return Response({'message': 'AI-generated questions feature has not been implemented yet.'},
