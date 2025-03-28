@@ -7,6 +7,7 @@ from ..models import User, Class, UserAbility, Assessment, AssessmentResult, Que
 from django.shortcuts import get_object_or_404
 from django.utils.dateparse import parse_datetime
 from api.decorators import auth_required
+import os
 
 
 @api_view(['GET'])
@@ -14,20 +15,13 @@ from api.decorators import auth_required
 def create_initial_assessment(request, class_id):
     user: User = request.user
 
-    question_ids = [
-        '24-A-01', '24-A-02', '24-A-03', '24-A-04', '24-A-05',
-        '24-A-06', '24-A-07', '24-A-08', '24-A-09', '24-A-10',
-        '24-A-11', '24-A-12', '24-A-13', '24-A-14', '24-A-15',
-        '24-A-16', '24-A-17', '24-A-18', '24-A-19', '24-A-20',
-        '24-A-21', '24-A-22', '24-A-23', '24-A-24', '24-A-25',
-        '24-A-26', '24-A-27', '24-A-28', '24-A-29', '24-A-30',
-        '24-A-31', '24-A-32', '24-A-33', '24-A-34', '24-A-35',
-        '24-A-36', '24-A-37', '24-A-38', '24-A-39', '24-A-40',
-        '24-A-41', '24-A-42', '24-A-43', '24-A-44', '24-A-45',
-        '24-A-46', '24-A-47', '24-A-48', '24-A-49', '24-A-50',
-        '24-A-51', '24-A-52', '24-A-53', '24-A-54', '24-A-55',
-        '24-A-56', '24-A-57', '24-A-58', '24-A-59', '24-A-60',
-    ]
+    # Load question IDs from file
+    file_path = os.path.join(os.path.dirname(__file__), "question_ids.txt")
+    try:
+        with open(file_path, "r") as file:
+            question_ids = [line.strip() for line in file if line.strip()]
+    except FileNotFoundError:
+        return Response({'error': 'Question ID file not found'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     if Assessment.objects.filter(class_owner__id=class_id, is_initial=True).exists():
         return Response({'error': 'Initial Assessment already exists'}, status=status.HTTP_400_BAD_REQUEST)
@@ -67,22 +61,15 @@ def create_class(request):
     # Create class and save students
     new_class = Class.objects.create(name=class_name, teacher=user)
 
-    # Create initial assessment
+    file_path = os.path.join(os.path.dirname(__file__), "question_ids.txt")
+    try:
+        with open(file_path, "r") as file:
+            question_ids = [line.strip() for line in file if line.strip()]
+    except FileNotFoundError:
+        return Response({'error': 'Question ID file not found'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    question_ids = [
-        '24-A-01', '24-A-02', '24-A-03', '24-A-04', '24-A-05',
-        '24-A-06', '24-A-07', '24-A-08', '24-A-09', '24-A-10',
-        '24-A-11', '24-A-12', '24-A-13', '24-A-14', '24-A-15',
-        '24-A-16', '24-A-17', '24-A-18', '24-A-19', '24-A-20',
-        '24-A-21', '24-A-22', '24-A-23', '24-A-24', '24-A-25',
-        '24-A-26', '24-A-27', '24-A-28', '24-A-29', '24-A-30',
-        '24-A-31', '24-A-32', '24-A-33', '24-A-34', '24-A-35',
-        '24-A-36', '24-A-37', '24-A-38', '24-A-39', '24-A-40',
-        '24-A-41', '24-A-42', '24-A-43', '24-A-44', '24-A-45',
-        '24-A-46', '24-A-47', '24-A-48', '24-A-49', '24-A-50',
-        '24-A-51', '24-A-52', '24-A-53', '24-A-54', '24-A-55',
-        '24-A-56', '24-A-57', '24-A-58', '24-A-59', '24-A-60',
-    ]
+    if Assessment.objects.filter(class_owner=new_class, is_initial=True).exists():
+        return Response({'error': 'Initial Assessment already exists'}, status=status.HTTP_400_BAD_REQUEST)
 
     assessment = Assessment.objects.create(
         name='Initial Assessment',
@@ -103,7 +90,6 @@ def create_class(request):
 
     assessment.selected_categories.set(selected_categories)
     assessment.questions.set(questions)
-
     return Response(
         {"message": "Class created successfully", "class_id": new_class.id, "class_code": new_class.class_code},
         status=201)

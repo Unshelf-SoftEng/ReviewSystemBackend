@@ -139,7 +139,7 @@ def take_initial_exam(request):
                                                                        "class_owner").first()
     if user.enrolled_class is None:
         return Response({'error': "You are not enrolled in any class"}, status=status.HTTP_403_FORBIDDEN
-        )
+                        )
 
     if not exam:
         return Response({"error": "Can't find initial exam"}, status=status.HTTP_404_NOT_FOUND)
@@ -290,13 +290,16 @@ def take_lesson_assessment(request, lesson_id):
     user: User = request.user
     data = request.data
 
-    no_of_questions = 20
+    no_of_questions = 1
 
     lesson = get_object_or_404(Lesson, id=lesson_id)
     lesson_category = get_object_or_404(Category, name=lesson.name)
 
     all_questions = list(Question.objects.filter(category_id=lesson_category.id))
     selected_questions = random.sample(list(all_questions), no_of_questions)
+
+    # TODO: Delete Afterwards
+    selected_questions = Question.objects.get(id='24-A-37')
 
     lesson_assessment = Assessment.objects.create(
         name=f'Lesson Quiz: {lesson.name}',
