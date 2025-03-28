@@ -22,9 +22,7 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 if not SECRET_KEY:
     raise ValueError("SECRET_KEY environment variable is not set!")
 
-DEBUG = os.getenv('DEBUG')
-if not DEBUG:
-    raise ValueError("DEBUG environment variable is not set!")
+DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 
 
 ALLOWED_HOSTS = ['reviewsystembackend-production.up.railway.app', 'reviewsystembackend.onrender.com', 'your-domain.com', 'localhost']
