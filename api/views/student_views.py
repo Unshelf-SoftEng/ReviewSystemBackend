@@ -3,13 +3,13 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 import random
 from django.utils import timezone
-from ..models import User, Question, Assessment, Answer, AssessmentResult, UserAbility, Category, Lesson, \
+from api.models import User, Question, Assessment, Answer, AssessmentResult, UserAbility, Category, Lesson, \
     LessonProgress, Class, AssessmentProgress, Chapter, Section
 from collections import defaultdict
-from ..ai.estimate_student_ability import estimate_ability_irt, estimate_ability_elo
+from api.ai.estimate_student_ability import estimate_ability_irt, estimate_ability_elo
 from django.shortcuts import get_object_or_404
-from ..decorators import auth_required
-
+from api.decorators import auth_required
+from datetime import timedelta
 
 
 @api_view(['GET'])
@@ -133,9 +133,10 @@ def initial_exam_taken(request):
 def take_initial_exam(request):
     user: User = request.user
 
+    # Optimize Assessment fetch
     exam = Assessment.objects.filter(
         class_owner=user.enrolled_class, is_initial=True
-    ).prefetch_related("questions").only("id", "time_limit", "deadline").first()
+    ).select_related("class_owner").prefetch_related("questions").only("id", "time_limit", "deadline", "class_owner").first()
 
     if not exam:
         return Response({"error": "Can't find initial exam"}, status=status.HTTP_404_NOT_FOUND)
@@ -144,40 +145,41 @@ def take_initial_exam(request):
         return Response({'error': 'Exam is not yet open'}, status=status.HTTP_400_BAD_REQUEST)
 
     if exam.deadline < timezone.now():
-        return Response({'error': 'Exam deadline has already passed'})
+        return Response({'error': 'Exam deadline has already passed'}, status=status.HTTP_400_BAD_REQUEST)
+
+    progress, created = AssessmentProgress.objects.get_or_create(
+        assessment=exam, user=user,
+        defaults={"start_time": timezone.now()}
+    )
+
+    end_time = progress.start_time + timedelta(seconds=exam.time_limit)
+    remaining_time = (end_time - timezone.now()).total_seconds()
+
+    if remaining_time <= 0:
+        return Response({'error': 'Time limit has exceeded'}, status=status.HTTP_400_BAD_REQUEST)
 
     if AssessmentResult.objects.filter(assessment=exam, user=user).exists():
         return Response({'error': 'Student has already taken the exam.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Fetch questions only once to prevent multiple queries
-    questions = list(exam.questions.all())
+    questions = list(exam.questions.values("id", "image_url", "question_text", "choices"))
 
     exam_data = {
         'exam_id': exam.id,
         'no_of_items': len(questions),
-        'time_limit': exam.time_limit,
+        'time_limit': int(remaining_time),
         'questions': [
             {
-                'question_id': question.id,
-                'image_url': question.image_url,
-                'question_text': question.question_text,
-                'choices': question.choices if isinstance(question.choices, list) else list(question.choices.values()),
+                'question_id': q["id"],
+                'image_url': q["image_url"],
+                'question_text': q["question_text"],
+                'choices': q["choices"] if isinstance(q["choices"], list) else list(q["choices"].values()),
             }
-            for question in questions
+            for q in questions
         ],
-        'question_ids': [question.id for question in questions],
+        'question_ids': [q["id"] for q in questions],
     }
 
-    # Only create AssessmentProgress if it does NOT exist
-    if not AssessmentProgress.objects.filter(assessment=exam, user=user).exists():
-        AssessmentProgress.objects.create(
-            assessment=exam,
-            user=user,
-            start_time=timezone.now()
-        )
-
     return Response(exam_data, status=status.HTTP_200_OK)
-
 
 @api_view(['GET'])
 @auth_required("student")
@@ -239,7 +241,10 @@ def check_time_limit(request, assessment_id):
     if assessment.time_limit is None:
         return Response({'error': 'No time limit.'}, status=status.HTTP_404_NOT_FOUND)
 
-    progress = get_object_or_404(AssessmentProgress, user=user, assessment_id=assessment_id)
+    progress = AssessmentProgress.objects.filter(user=user, assessment_id=assessment_id).first()
+
+    if progress is None:
+        return Response({'error': "No progress found for this assessment."}, status=status.HTTP_404_NOT_FOUND)
 
     elapsed_time = (timezone.now() - progress.start_time).total_seconds()
     total_time_allowed = progress.assessment.time_limit
@@ -347,7 +352,8 @@ def get_assessment_result(request, assessment_id):
         serialized_answers.append({
             'question_id': answer.question.id,
             'question_text': answer.question.question_text,
-            'choices': answer.question.choices if isinstance(answer.question.choices, list) else list(answer.question.choices.values()),
+            'choices': answer.question.choices if isinstance(answer.question.choices, list) else list(
+                answer.question.choices.values()),
             'correct_answer': answer.question.choices[answer.question.correct_answer],
             'chosen_answer': answer.chosen_answer,
             'is_correct': answer.is_correct,
@@ -457,7 +463,7 @@ def create_student_quiz(request):
 
 @api_view(['POST'])
 @auth_required("student")
-def take_lesson_quiz(request):
+def take_lesson_assessment(request):
     user: User = request.user
     data = request.data
 
@@ -470,7 +476,7 @@ def take_lesson_quiz(request):
     all_questions = list(Question.objects.filter(category_id=lesson_category.id))
     selected_questions = random.sample(list(all_questions), no_of_questions)
 
-    lesson_quiz = Assessment.objects.create(
+    lesson_assessment = Assessment.objects.create(
         lesson=lesson,
         created_by=user,
         type='Quiz',
@@ -478,11 +484,11 @@ def take_lesson_quiz(request):
         source='lesson',
     )
 
-    lesson_quiz.selected_categories.set([lesson_category.id])
-    lesson_quiz.questions.set(selected_questions)
+    lesson_assessment.selected_categories.set([lesson_category.id])
+    lesson_assessment.questions.set(selected_questions)
 
     quiz_data = {
-        'quiz_id': lesson_quiz.id,
+        'quiz_id': lesson_assessment.id,
         'questions': [
             {
                 'question_id': question.id,
@@ -495,6 +501,75 @@ def take_lesson_quiz(request):
     }
 
     return Response(quiz_data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@auth_required("student")
+def take_chapter_assessment(request):
+    user: User = request.user
+    data = request.data
+
+    chapter_name = data.get('chapter')
+    no_of_questions = data.get('no_of_questions')
+
+    chapter = get_object_or_404(Chapter, name=chapter_name)
+
+    all_questions = list(Question.objects.filter(chapter__name=chapter_name))
+    selected_questions = random.sample(list(all_questions), no_of_questions)
+
+    chapter_assessment = Assessment.objects.create(
+        chapter=chapter,
+        created_by=user,
+        type='Quiz',
+        question_source='previous_exam',
+        source='lesson',
+    )
+
+    chapter_assessment.selected_categories.set([chapter.lesson.id])
+    chapter_assessment.questions.set(selected_questions)
+
+    quiz_data = {
+        'quiz_id': chapter_assessment.id,
+        'questions': [
+            {
+                'question_id': question.id,
+                'image_url': question.image_url,
+                'question_text': question.question_text,
+                'choices': question.choices
+            }
+            for question in selected_questions
+        ]
+    }
+
+    return Response(quiz_data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+@auth_required("student")
+def take_teacher_assessment(request, assessment_id):
+    user: User = request.user
+
+    assessment = Assessment.objects.filter(assessment__id=assessment_id)
+
+    if user.enrolled_class != assessment.class_owner:
+        return Response({'error': "User doesn't belong to the class"}, status=status.HTTP_403_FORBIDDEN)
+
+    quiz_data = {
+        'quiz_id': assessment.id,
+        'deadline': assessment.deadline,
+        'type': assessment.type,
+        'questions': [
+            {
+                'question_id': question.id,
+                'image_url': question.image_url,
+                'question_text': question.question_text,
+                'choices': question.choices
+            }
+            for question in assessment.questions
+        ]
+    }
+
+    return Response(quiz_data, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])

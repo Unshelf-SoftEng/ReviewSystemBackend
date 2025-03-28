@@ -7,7 +7,6 @@ from ..models import User, Class, UserAbility, Assessment, AssessmentResult, Que
 from django.shortcuts import get_object_or_404
 from django.utils.dateparse import parse_datetime
 from api.decorators import auth_required
-from django.db.models import Avg
 
 
 @api_view(['GET'])
@@ -88,7 +87,7 @@ def create_class(request):
     assessment = Assessment.objects.create(
         name='Initial Assessment',
         class_owner=new_class,
-        type='exam',
+        type='Exam',
         question_source='previous_exam',
         source='admin_generated',
         time_limit=8100,
@@ -126,7 +125,6 @@ def get_classes(request):
             'number_of_students': num_students
         })
 
-    # Return the data in the response
     return Response({"classes": data_result}, status=status.HTTP_200_OK)
 
 
@@ -235,9 +233,10 @@ def get_all_questions(request):
 
 @api_view(['POST'])
 @auth_required("teacher")
-def create_quiz(request, class_id):
+def create_assessment(request, class_id):
     question_source = request.data.get('question_source')
     questions = request.data.get('questions')
+    quiz_type = request.data.get('type', 'Quiz') or 'Quiz'
 
     if not question_source:
         return Response({'error': 'Question source not provided'}, status=status.HTTP_400_BAD_REQUEST)
@@ -260,7 +259,7 @@ def create_quiz(request, class_id):
         quiz.questions.set(selected_questions)
         quiz.deadline = parse_datetime(request.data.get('deadline')) if request.data.get('deadline') else None
         quiz.no_of_questions = request.data.get('no_of_questions')
-        quiz.type = "quiz"
+        quiz.type = quiz_type
         quiz.status = "created"
         quiz.source = "teacher_generated"
         quiz.save()
@@ -366,12 +365,10 @@ def update_assessment(request, assessment_id):
     questions = request.data.get("questions", [])
     assessment = get_object_or_404(Assessment, id=assessment_id)
 
-    # Update deadline only if provided
     if "deadline" in request.data:
         assessment.deadline = parse_datetime(request.data["deadline"]) if request.data["deadline"] else None
-        assessment.save(update_fields=["deadline"])  # Only update the deadline field
+        assessment.save(update_fields=["deadline"])
 
-    # Fetch all relevant questions in a single query
     question_ids = [q["id"] for q in questions]
     existing_questions = {q.id: q for q in Question.objects.filter(id__in=question_ids)}
 
@@ -395,8 +392,6 @@ def update_assessment(request, assessment_id):
 @auth_required("teacher")
 def delete_assessment(request, quiz_id):
     assessment = get_object_or_404(Assessment, id=quiz_id)
-
-    # Check for related AssessmentResult or AssessmentProgress
     has_results = AssessmentResult.objects.filter(assessment=assessment).exists()
     has_progress = AssessmentProgress.objects.filter(assessment=assessment).exists()
 
@@ -433,7 +428,6 @@ def get_lesson(request, lesson_id):
             status=status.HTTP_403_FORBIDDEN
         )
 
-    # Fetch assessment result in one query (avoid multiple `.exists()` calls)
     has_completed_assessment = AssessmentResult.objects.filter(assessment__lesson=lesson).exists()
 
     lesson_structure = [
@@ -459,7 +453,6 @@ def get_lesson(request, lesson_id):
         for chapter in lesson.chapters.all()
     ]
 
-    # Append final lesson quiz info
     lesson_structure.append({
         "type": "quiz",
         "title": "Final Lesson Quiz",
@@ -507,7 +500,6 @@ def get_chapter(request, lesson_id, chapter_id):
 @api_view(['GET'])
 @auth_required("teacher")
 def get_lesson_quiz(request, class_id, lesson_id):
-    # Fetch students in one query
     students = User.objects.filter(enrolled_class_id=class_id)
     lesson = get_object_or_404(Lesson, id=lesson_id)
     assessments = Assessment.objects.filter(lesson=lesson, created_by__in=students)

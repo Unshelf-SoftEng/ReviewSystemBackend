@@ -2,15 +2,14 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from api.utils.supabase_client import get_supabase_client
-from api.models import User, Lesson, Category, UserAbility
+from api.models import User, Category, UserAbility
 from api.decorators import auth_required
 
 
 @api_view(['POST'])
 def register_user(request):
     if request.method == 'POST':
-        # Parse data from the request
-        data = request.data  # Automatically parses JSON into a dictionary
+        data = request.data
         email = data.get('email')
         password = data.get('password')
         first_name = data.get('first_name')
@@ -44,8 +43,6 @@ def register_user(request):
                 for category in categories:
                     UserAbility.objects.create(user=new_user, category=category, elo_ability=1000, irt_ability=0)
 
-                lessons = Lesson.objects.all()
-
             return Response({'message': 'User registered successfully!'}, status=status.HTTP_201_CREATED)
         except Exception as e:
 
@@ -56,14 +53,13 @@ def register_user(request):
 
 @api_view(['POST'])
 def login_user(request):
-    data = request.data  # Automatically parses JSON into a dictionary
+    data = request.data
     email = data.get('email')
     password = data.get('password')
 
     supabase = get_supabase_client()
 
     try:
-        # Authenticate user with Supabase
         auth_response = supabase.auth.sign_in_with_password({
             'email': email,
             'password': password
@@ -82,13 +78,12 @@ def login_user(request):
             'last_name': last_name
         }, status=status.HTTP_200_OK)
 
-        # Set cookies for authentication (HttpOnly for security)
         response.set_cookie(
-            key='jwt_token',
+            key='access_token',
             value=auth_response.session.access_token,
-            httponly=True,  # Prevent JavaScript access
+            httponly=True,
             secure=True,
-            samesite='None'
+            samesite='None',
         )
 
         response.set_cookie(
@@ -96,7 +91,8 @@ def login_user(request):
             value=auth_response.session.refresh_token,
             httponly=True,
             secure=True,
-            samesite='None'
+            samesite='None',
+            max_age=2592000,
         )
 
         return response
@@ -108,10 +104,10 @@ def login_user(request):
         return Response({'error': f'Error: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
 
-@api_view(['POST'])
+@api_view(['GET'])
 def logout_user(request):
     response = Response({'message': 'Logout successful'}, status=status.HTTP_200_OK)
-    response.delete_cookie('jwt_token')
+    response.delete_cookie('access_token')
     response.delete_cookie('refresh_token')
 
     return response
@@ -158,6 +154,7 @@ def get_user_details(request):
 
     return Response(user_data, status=status.HTTP_200_OK)
 
+
 @api_view(['POST'])
 @auth_required()
 def reset_password(request):
@@ -167,6 +164,7 @@ def reset_password(request):
         email=email,
         options={'redirect_to': 'https://localhost:3000/update_password/'}
     )
+
 
 @api_view(['GET'])
 def auth_user(request):
