@@ -83,12 +83,11 @@ def login_user(request):
         print("Refresh token", auth_response.session.refresh_token)
 
         response.set_cookie(
-            key='jwt_token',
+            key='access_token',
             value=auth_response.session.access_token,
             httponly=True,
             secure=True,
             samesite='None',
-            max_age=3600
         )
 
         response.set_cookie(
@@ -109,10 +108,10 @@ def login_user(request):
         return Response({'error': f'Error: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
 
-@api_view(['POST'])
+@api_view(['GET'])
 def logout_user(request):
     response = Response({'message': 'Logout successful'}, status=status.HTTP_200_OK)
-    response.delete_cookie('jwt_token')
+    response.delete_cookie('access_token')
     response.delete_cookie('refresh_token')
 
     return response

@@ -22,7 +22,6 @@ def auth_required(*allowed_roles):
 
             try:
                 if token:
-                    print("JWT Token", token)
                     try:
                         user_data = supabase_client.auth.get_user(jwt=token)
                         if user_data and user_data.user:
@@ -36,7 +35,7 @@ def auth_required(*allowed_roles):
                             request.user = user
                             return view_func(request, *args, **kwargs)
                     except AuthApiError as e:
-                        # Token might be expired, try to refresh
+                        print('JWT Token Error', e)
                         if not refresh_token:
                             raise
 
@@ -75,7 +74,6 @@ def auth_required(*allowed_roles):
                             httponly=True,
                             secure=True,
                             samesite='None',
-                            max_age=30
                         )
                         response.set_cookie(
                             key='refresh_token',
