@@ -44,7 +44,7 @@ def auth_required(*allowed_roles):
                     httponly=True,
                     secure=True,
                     samesite='None',
-                    max_age=3600,
+                    max_age=30,
                 )
 
                 response.set_cookie(

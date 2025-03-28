@@ -9,8 +9,7 @@ from api.decorators import auth_required
 @api_view(['POST'])
 def register_user(request):
     if request.method == 'POST':
-        # Parse data from the request
-        data = request.data  # Automatically parses JSON into a dictionary
+        data = request.data
         email = data.get('email')
         password = data.get('password')
         first_name = data.get('first_name')
@@ -56,7 +55,7 @@ def register_user(request):
 
 @api_view(['POST'])
 def login_user(request):
-    data = request.data  # Automatically parses JSON into a dictionary
+    data = request.data
     email = data.get('email')
     password = data.get('password')
 
@@ -82,14 +81,13 @@ def login_user(request):
             'last_name': last_name
         }, status=status.HTTP_200_OK)
 
-        # Set cookies for authentication (HttpOnly for security)
         response.set_cookie(
             key='jwt_token',
             value=auth_response.session.access_token,
             httponly=True,
             secure=True,
             samesite='None',
-            max_age=3600
+            max_age=30
         )
 
         response.set_cookie(

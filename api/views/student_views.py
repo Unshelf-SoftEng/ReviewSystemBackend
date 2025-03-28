@@ -11,7 +11,6 @@ from django.shortcuts import get_object_or_404
 from ..decorators import auth_required
 
 
-
 @api_view(['GET'])
 @auth_required("student")
 def get_class(request):
@@ -347,7 +346,8 @@ def get_assessment_result(request, assessment_id):
         serialized_answers.append({
             'question_id': answer.question.id,
             'question_text': answer.question.question_text,
-            'choices': answer.question.choices if isinstance(answer.question.choices, list) else list(answer.question.choices.values()),
+            'choices': answer.question.choices if isinstance(answer.question.choices, list) else list(
+                answer.question.choices.values()),
             'correct_answer': answer.question.choices[answer.question.correct_answer],
             'chosen_answer': answer.chosen_answer,
             'is_correct': answer.is_correct,
@@ -457,7 +457,7 @@ def create_student_quiz(request):
 
 @api_view(['POST'])
 @auth_required("student")
-def take_lesson_quiz(request):
+def take_lesson_assessment(request):
     user: User = request.user
     data = request.data
 
@@ -470,7 +470,7 @@ def take_lesson_quiz(request):
     all_questions = list(Question.objects.filter(category_id=lesson_category.id))
     selected_questions = random.sample(list(all_questions), no_of_questions)
 
-    lesson_quiz = Assessment.objects.create(
+    lesson_assessment = Assessment.objects.create(
         lesson=lesson,
         created_by=user,
         type='Quiz',
@@ -478,11 +478,11 @@ def take_lesson_quiz(request):
         source='lesson',
     )
 
-    lesson_quiz.selected_categories.set([lesson_category.id])
-    lesson_quiz.questions.set(selected_questions)
+    lesson_assessment.selected_categories.set([lesson_category.id])
+    lesson_assessment.questions.set(selected_questions)
 
     quiz_data = {
-        'quiz_id': lesson_quiz.id,
+        'quiz_id': lesson_assessment.id,
         'questions': [
             {
                 'question_id': question.id,
@@ -495,6 +495,75 @@ def take_lesson_quiz(request):
     }
 
     return Response(quiz_data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@auth_required("student")
+def take_chapter_assessment(request):
+    user: User = request.user
+    data = request.data
+
+    chapter_name = data.get('chapter')
+    no_of_questions = data.get('no_of_questions')
+
+    chapter = get_object_or_404(Chapter, name=chapter_name)
+
+    all_questions = list(Question.objects.filter(chapter__name=chapter_name))
+    selected_questions = random.sample(list(all_questions), no_of_questions)
+
+    chapter_assessment = Assessment.objects.create(
+        chapter=chapter,
+        created_by=user,
+        type='Quiz',
+        question_source='previous_exam',
+        source='lesson',
+    )
+
+    chapter_assessment.selected_categories.set([chapter.lesson.id])
+    chapter_assessment.questions.set(selected_questions)
+
+    quiz_data = {
+        'quiz_id': chapter_assessment.id,
+        'questions': [
+            {
+                'question_id': question.id,
+                'image_url': question.image_url,
+                'question_text': question.question_text,
+                'choices': question.choices
+            }
+            for question in selected_questions
+        ]
+    }
+
+    return Response(quiz_data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+@auth_required("student")
+def take_teacher_assessment(request, assessment_id):
+    user: User = request.user
+
+    assessment = Assessment.objects.filter(assessment__id=assessment_id)
+
+    if user.enrolled_class != assessment.class_owner:
+        return Response({'error': "User doesn't belong to the class"}, status=status.HTTP_403_FORBIDDEN)
+
+    quiz_data = {
+        'quiz_id': assessment.id,
+        'deadline': assessment.deadline,
+        'type': assessment.type,
+        'questions': [
+            {
+                'question_id': question.id,
+                'image_url': question.image_url,
+                'question_text': question.question_text,
+                'choices': question.choices
+            }
+            for question in assessment.questions
+        ]
+    }
+
+    return Response(quiz_data, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
