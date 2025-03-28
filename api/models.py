@@ -137,7 +137,7 @@ class Answer(models.Model):
     assessment_result = models.ForeignKey(AssessmentResult, related_name='answers', on_delete=models.CASCADE)
     question = models.ForeignKey(Question, related_name='question', on_delete=models.CASCADE)
     time_spent = models.IntegerField(default=0)
-    chosen_answer = models.CharField(max_length=255)
+    chosen_answer = models.TextField()
     is_correct = models.BooleanField(default=False)
 
     def __str__(self):

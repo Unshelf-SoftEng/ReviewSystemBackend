@@ -9,6 +9,7 @@ from collections import defaultdict
 from api.ai.estimate_student_ability import estimate_ability_irt, estimate_ability_elo
 from django.shortcuts import get_object_or_404
 from api.decorators import auth_required
+from datetime import timedelta
 
 
 @api_view(['GET'])
@@ -132,9 +133,10 @@ def initial_exam_taken(request):
 def take_initial_exam(request):
     user: User = request.user
 
+    # Optimize Assessment fetch
     exam = Assessment.objects.filter(
         class_owner=user.enrolled_class, is_initial=True
-    ).prefetch_related("questions").only("id", "time_limit", "deadline").first()
+    ).select_related("class_owner").prefetch_related("questions").only("id", "time_limit", "deadline", "class_owner").first()
 
     if not exam:
         return Response({"error": "Can't find initial exam"}, status=status.HTTP_404_NOT_FOUND)
@@ -143,40 +145,41 @@ def take_initial_exam(request):
         return Response({'error': 'Exam is not yet open'}, status=status.HTTP_400_BAD_REQUEST)
 
     if exam.deadline < timezone.now():
-        return Response({'error': 'Exam deadline has already passed'})
+        return Response({'error': 'Exam deadline has already passed'}, status=status.HTTP_400_BAD_REQUEST)
+
+    progress, created = AssessmentProgress.objects.get_or_create(
+        assessment=exam, user=user,
+        defaults={"start_time": timezone.now()}
+    )
+
+    end_time = progress.start_time + timedelta(seconds=exam.time_limit)
+    remaining_time = (end_time - timezone.now()).total_seconds()
+
+    if remaining_time <= 0:
+        return Response({'error': 'Time limit has exceeded'}, status=status.HTTP_400_BAD_REQUEST)
 
     if AssessmentResult.objects.filter(assessment=exam, user=user).exists():
         return Response({'error': 'Student has already taken the exam.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Fetch questions only once to prevent multiple queries
-    questions = list(exam.questions.all())
+    questions = list(exam.questions.values("id", "image_url", "question_text", "choices"))
 
     exam_data = {
         'exam_id': exam.id,
         'no_of_items': len(questions),
-        'time_limit': exam.time_limit,
+        'time_limit': int(remaining_time),
         'questions': [
             {
-                'question_id': question.id,
-                'image_url': question.image_url,
-                'question_text': question.question_text,
-                'choices': question.choices if isinstance(question.choices, list) else list(question.choices.values()),
+                'question_id': q["id"],
+                'image_url': q["image_url"],
+                'question_text': q["question_text"],
+                'choices': q["choices"] if isinstance(q["choices"], list) else list(q["choices"].values()),
             }
-            for question in questions
+            for q in questions
         ],
-        'question_ids': [question.id for question in questions],
+        'question_ids': [q["id"] for q in questions],
     }
 
-    # Only create AssessmentProgress if it does NOT exist
-    if not AssessmentProgress.objects.filter(assessment=exam, user=user).exists():
-        AssessmentProgress.objects.create(
-            assessment=exam,
-            user=user,
-            start_time=timezone.now()
-        )
-
     return Response(exam_data, status=status.HTTP_200_OK)
-
 
 @api_view(['GET'])
 @auth_required("student")
@@ -238,7 +241,10 @@ def check_time_limit(request, assessment_id):
     if assessment.time_limit is None:
         return Response({'error': 'No time limit.'}, status=status.HTTP_404_NOT_FOUND)
 
-    progress = get_object_or_404(AssessmentProgress, user=user, assessment_id=assessment_id)
+    progress = AssessmentProgress.objects.filter(user=user, assessment_id=assessment_id).first()
+
+    if progress is None:
+        return Response({'error': "No progress found for this assessment."}, status=status.HTTP_404_NOT_FOUND)
 
     elapsed_time = (timezone.now() - progress.start_time).total_seconds()
     total_time_allowed = progress.assessment.time_limit

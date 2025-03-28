@@ -17,7 +17,7 @@ def auth_required(*allowed_roles):
 
             # If no tokens at all
             if not token and not refresh_token:
-                return Response({'error': 'Authentication required'},
+                return Response({'error': 'Authentication required. Please log in again'},
                                 status=status.HTTP_401_UNAUTHORIZED)
 
             try:
@@ -29,7 +29,7 @@ def auth_required(*allowed_roles):
                             user = get_object_or_404(User, supabase_user_id=supabase_uid)
 
                             if allowed_roles and user.role not in allowed_roles:
-                                return Response({"error": "Unauthorized"},
+                                return Response({"error": "You are not allowed to access this resource"},
                                                 status=status.HTTP_403_FORBIDDEN)
 
                             request.user = user
