@@ -51,14 +51,14 @@ class UserAbility(models.Model):
 
 class Question(models.Model):
     id = models.CharField(max_length=10, unique=True, primary_key=True)
-    question_text = models.CharField()
-    image_url = models.CharField(max_length=255, null=True)
+    question_text = models.TextField()
+    image_url = models.TextField(blank=True, null=True)
     category = models.ForeignKey(Category, related_name='questions', on_delete=models.CASCADE)
     difficulty = models.FloatField(default=0.0)
     discrimination = models.FloatField(default=1.0)
     guessing = models.FloatField(default=0.0)
     choices = models.JSONField()
-    correct_answer = models.CharField(max_length=255)
+    correct_answer = models.CharField(max_length=1)
     is_ai_generated = models.BooleanField(default=False)
 
     def __str__(self):

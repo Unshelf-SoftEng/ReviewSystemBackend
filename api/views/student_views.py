@@ -233,6 +233,9 @@ def check_time_limit(request, assessment_id):
 
     assessment: Assessment = Assessment.objects.filter(id=assessment_id).first()
 
+    if assessment is None:
+        return Response({'error': 'Assessment does not exist'}, status=status.HTTP_404_NOT_FOUND)
+
     if assessment.time_limit is None:
         return Response({'error': 'No time limit.'}, status=status.HTTP_404_NOT_FOUND)
 
