@@ -36,6 +36,14 @@ class Category(models.Model):
         return self.name
 
 
+class Subcategory(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    category = models.ForeignKey(Category, related_name='subcategories', on_delete=models.CASCADE)
+
+    def __str__(self):
+        return f"{self.category.name} - {self.name}"
+
+
 class UserAbility(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     category = models.ForeignKey(Category, on_delete=models.CASCADE)
@@ -54,11 +62,13 @@ class Question(models.Model):
     question_text = models.TextField()
     image_url = models.TextField(blank=True, null=True)
     category = models.ForeignKey(Category, related_name='questions', on_delete=models.CASCADE)
+    subcategory = models.ForeignKey(Subcategory, related_name='questions', on_delete=models.CASCADE, blank=True, null=True)
     difficulty = models.FloatField(default=0.0)
     discrimination = models.FloatField(default=1.0)
     guessing = models.FloatField(default=0.0)
     choices = models.JSONField()
     correct_answer = models.CharField(max_length=1)
+
     is_ai_generated = models.BooleanField(default=False)
 
     def __str__(self):
@@ -187,7 +197,8 @@ class LessonProgress(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='lesson_progress')
     lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name='progress')
     current_chapter = models.ForeignKey(Chapter, on_delete=models.CASCADE, related_name='progress')
-    current_section = models.ForeignKey(Section, on_delete=models.CASCADE, related_name='progress', null=True, blank=True)
+    current_section = models.ForeignKey(Section, on_delete=models.CASCADE, related_name='progress', null=True,
+                                        blank=True)
 
     def __str__(self):
         return f"{self.user.full_name} - {self.lesson.name} | Chapter: {self.current_chapter} | Section: {self.current_section}"

@@ -37,8 +37,12 @@ def auth_required(*allowed_roles):
                         if not new_session or not new_session.session:
                             raise Exception("Failed to refresh session")
 
+                        print('Session refreshed')
+                        print('new_access_token', new_session.session.access_token)
+                        print('new_refresh_token', new_session.session.refresh_token)
                         new_access_token = new_session.session.access_token
                         new_refresh_token = new_session.session.refresh_token
+
                         user_data = supabase_client.auth.get_user(jwt=new_access_token)
                         user = User.objects.get(supabase_user_id=user_data.user.id)
                         request.user = user
@@ -61,9 +65,8 @@ def auth_required(*allowed_roles):
                         return response
 
                     except Exception as e:
-                        print(f"Here we have Error fetching user data: {str(e)}")
-                        return Response({'error': 'Invalid or expired refresh token. Please log in again.'},
-                                        status=status.HTTP_401_UNAUTHORIZED)
+                        return Response({'error': f'{str(e)}'},
+                                        status=status.HTTP_404_NOT_FOUND)
                 else:
                     print(f"There is no refresh token found")
                     return Response({'error': 'Invalid or expired token. Please log in again.'},
