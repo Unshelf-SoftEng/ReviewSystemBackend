@@ -12,6 +12,9 @@ from api.decorators import auth_required
 from datetime import timedelta
 from django.utils.timezone import now
 
+AUTO_SUBMISSION_GRACE_PERIOD = 30
+
+
 @api_view(['GET'])
 @auth_required("student")
 def get_class(request):
@@ -244,7 +247,8 @@ def take_quiz(request):
     recent_quiz = Assessment.objects.filter(created_by=user, created_at__gte=one_hour_ago).exists()
 
     if recent_quiz:
-        return Response({'error': 'You can only take one quiz per 30 minutes.'}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+        return Response({'error': 'You can only take one quiz per 30 minutes.'},
+                        status=status.HTTP_429_TOO_MANY_REQUESTS)
 
     if question_source == 'previous_exam':
         all_questions = Question.objects.filter(category_id__in=selected_categories)
@@ -305,7 +309,7 @@ def take_lesson_assessment(request, lesson_id):
     selected_questions = random.sample(list(all_questions), no_of_questions)
 
     # TODO: Delete Afterwards
-    selected_questions = Question.objects.get(id='24-A-37')
+    selected_questions = Question.objects.filter(id='24-A-37')
 
     lesson_assessment = Assessment.objects.create(
         name=f'Lesson Quiz: {lesson.name}',
@@ -458,20 +462,29 @@ def submit_assessment(request, assessment_id):
     assessment_progress = AssessmentProgress.objects.filter(user=user, assessment_id=assessment_id).first()
 
     is_auto_submission = False
-    if assessment.deadline or assessment.time_limit:
-        if assessment_progress:
-            time_elapsed = (current_time - assessment_progress.start_time).total_seconds()
-            end_time = assessment_progress.start_time + timedelta(seconds=assessment.time_limit)
-            is_auto_submission = (
-                    (assessment.time_limit and time_elapsed >= assessment.time_limit) or
-                    (assessment.deadline and end_time >= assessment.deadline)
-            )
-        else:
-            is_auto_submission = False
 
-    if not is_auto_submission and assessment.deadline and current_time > assessment.deadline:
-        return Response({'error': 'The deadline for this assessment has already passed.'},
-                        status=status.HTTP_400_BAD_REQUEST)
+    if assessment_progress:
+        time_elapsed = (current_time - assessment_progress.start_time).total_seconds()
+        end_time = assessment_progress.start_time + timedelta(
+            seconds=assessment.time_limit) if assessment.time_limit else None
+        deadline_time = assessment.deadline if assessment.deadline else None
+
+        # Check if we are within the auto-submission window (grace period before limit)
+        if (
+                (assessment.time_limit and current_time >= end_time - timedelta(
+                    seconds=AUTO_SUBMISSION_GRACE_PERIOD)) or
+                (assessment.deadline and current_time >= deadline_time - timedelta(
+                    seconds=AUTO_SUBMISSION_GRACE_PERIOD))
+        ):
+            is_auto_submission = True
+
+        # 🚨 Block manual submission if past the strict limit (no grace period)
+        if not is_auto_submission and (
+                (assessment.time_limit and current_time >= end_time) or
+                (assessment.deadline and current_time >= deadline_time)
+        ):
+            return Response({'error': 'Submission not allowed. Time limit or deadline exceeded.'},
+                            status=status.HTTP_400_BAD_REQUEST)
 
     answers = request.data.get('answers', [])
 
