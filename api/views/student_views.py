@@ -237,12 +237,12 @@ def take_quiz(request):
     no_of_questions = int(request.data.get('no_of_questions', 5))
     question_source = request.data.get('question_source')
 
-    one_hour_ago = now() - timedelta(minutes=30)
-    recent_quiz = Assessment.objects.filter(created_by=user, created_at__gte=one_hour_ago).exists()
-
-    if recent_quiz:
-        return Response({'error': 'You can only take one quiz per 30 minutes.'},
-                        status=status.HTTP_429_TOO_MANY_REQUESTS)
+    # one_hour_ago = now() - timedelta(minutes=30)
+    # recent_quiz = Assessment.objects.filter(created_by=user, created_at__gte=one_hour_ago).exists()
+    #
+    # if recent_quiz:
+    #     return Response({'error': 'You can only take one quiz per 30 minutes.'},
+    #                     status=status.HTTP_429_TOO_MANY_REQUESTS)
 
     if question_source == 'previous_exam':
         all_questions = Question.objects.filter(category_id__in=selected_categories)
