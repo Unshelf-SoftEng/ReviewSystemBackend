@@ -300,7 +300,14 @@ def take_lesson_assessment(request, lesson_id):
     user: User = request.user
     data = request.data
 
-    no_of_questions = 1
+    no_of_questions = int(data['no_of_questions'])
+
+    one_hour_ago = now() - timedelta(minutes=30)
+    recent_quiz = Assessment.objects.filter(created_by=user, created_at__gte=one_hour_ago).exists()
+
+    if recent_quiz:
+        return Response({'error': 'You can only take one quiz per 30 minutes.'},
+                        status=status.HTTP_429_TOO_MANY_REQUESTS)
 
     lesson = get_object_or_404(Lesson, id=lesson_id)
     lesson_category = get_object_or_404(Category, name=lesson.name)
