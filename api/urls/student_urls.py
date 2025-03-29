@@ -19,6 +19,7 @@ urlpatterns = [
     path('quiz/<int:assessment_id>/submit', student_views.submit_assessment, name='submit_quiz'),
     path('quiz/<int:assessment_id>', student_views.get_assessment_result, name='get_quiz_results'),
     path('class/assessments', student_views.get_class_assessments, name='get_class_quizzes'),
+    path('lessons', student_views.get_lessons, name='get_lessons'),
     path('lesson/<int:lesson_id>/chapter/<int:chapter_id>', student_views.get_chapter, name='get_chapter'),
     path('lesson/<int:lesson_id>/update-progress', student_views.update_lesson_progress, name='update_lesson_progress'),
     path('lesson/<int:lesson_id>', student_views.get_lesson, name='get_lesson'),

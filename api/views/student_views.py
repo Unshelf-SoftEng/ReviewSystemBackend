@@ -460,15 +460,17 @@ def submit_assessment(request, assessment_id):
     if AssessmentResult.objects.filter(assessment=assessment, user=user).exists():
         return Response({'error': 'Exam was already taken.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    assessment_progress = AssessmentProgress.objects.filter(user=user, assessment_id=assessment_id).first()
+    if assessment.time_limit:
 
-    is_auto_submission = False
+        assessment_progress = AssessmentProgress.objects.filter(user=user, assessment_id=assessment_id).first()
 
-    if assessment_progress:
-        time_elapsed = (current_time - assessment_progress.start_time).total_seconds()
-        end_time = assessment_progress.start_time + timedelta(
-            seconds=assessment.time_limit) if assessment.time_limit else None
-        deadline_time = assessment.deadline if assessment.deadline else None
+        is_auto_submission = False
+
+        if assessment_progress:
+            time_elapsed = (current_time - assessment_progress.start_time).total_seconds()
+            end_time = assessment_progress.start_time + timedelta(
+                seconds=assessment.time_limit) if assessment.time_limit else None
+            deadline_time = assessment.deadline if assessment.deadline else None
 
         # Check if we are within the auto-submission window (grace period before limit)
         if (
@@ -697,6 +699,24 @@ def get_history(request):
         history.append(item)
 
     return Response(history, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@auth_required("student")
+def get_lessons(request):
+    lessons = Lesson.objects.only("id", "name", "is_locked")
+
+    # Generate lesson data efficiently using list comprehension
+    lesson_data = [
+        {
+            "id": lesson.id,
+            "lesson_name": lesson.name,
+            "is_locked": lesson.is_locked,
+        }
+        for lesson in lessons
+    ]
+
+    return Response(lesson_data, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
