@@ -10,7 +10,7 @@ from api.ai.estimate_student_ability import estimate_ability_irt, estimate_abili
 from django.shortcuts import get_object_or_404
 from api.decorators import auth_required
 from datetime import timedelta
-
+from django.utils.timezone import now
 
 @api_view(['GET'])
 @auth_required("student")
@@ -239,6 +239,12 @@ def take_quiz(request):
     selected_categories = [int(cat) for cat in selected_categories] if selected_categories else []
     no_of_questions = int(request.data.get('no_of_questions', 5))
     question_source = request.data.get('question_source')
+
+    one_hour_ago = now() - timedelta(minutes=30)
+    recent_quiz = Assessment.objects.filter(created_by=user, created_at__gte=one_hour_ago).exists()
+
+    if recent_quiz:
+        return Response({'error': 'You can only take one quiz per 30 minutes.'}, status=status.HTTP_429_TOO_MANY_REQUESTS)
 
     if question_source == 'previous_exam':
         all_questions = Question.objects.filter(category_id__in=selected_categories)
