@@ -472,14 +472,14 @@ def submit_assessment(request, assessment_id):
                 seconds=assessment.time_limit) if assessment.time_limit else None
             deadline_time = assessment.deadline if assessment.deadline else None
 
-        # Check if we are within the auto-submission window (grace period before limit)
-        if (
-                (assessment.time_limit and current_time >= end_time - timedelta(
-                    seconds=AUTO_SUBMISSION_GRACE_PERIOD)) or
-                (assessment.deadline and current_time >= deadline_time - timedelta(
-                    seconds=AUTO_SUBMISSION_GRACE_PERIOD))
-        ):
-            is_auto_submission = True
+            # Check if we are within the auto-submission window (grace period before limit)
+            if (
+                    (assessment.time_limit and current_time >= end_time - timedelta(
+                        seconds=AUTO_SUBMISSION_GRACE_PERIOD)) or
+                    (assessment.deadline and current_time >= deadline_time - timedelta(
+                        seconds=AUTO_SUBMISSION_GRACE_PERIOD))
+            ):
+                is_auto_submission = True
 
         # 🚨 Block manual submission if past the strict limit (no grace period)
         if not is_auto_submission and (
