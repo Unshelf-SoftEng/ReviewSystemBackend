@@ -17,54 +17,47 @@ AUTO_SUBMISSION_GRACE_PERIOD = 30
 
 @api_view(['GET'])
 @auth_required("student")
+def joined_class(request):
+    user: User = request.user
+
+    response_data = {
+        'joined': user.enrolled_class is not None
+    }
+
+    return Response(response_data, status=status.HTTP_200_OK)
+
+
+@api_view(["GET"])
+@auth_required("student")
 def get_class(request):
     user: User = request.user
 
-    if user.enrolled_class is None:
+    if not user.enrolled_class:
         return Response({"message": "You are not enrolled in any class."}, status=status.HTTP_200_OK)
 
-    lessons = Lesson.objects.all()
-    lesson_data = []
-
-    for lesson in lessons:
-        if lesson.is_locked:
-            lesson_data.append({
-                "id": lesson.id,
-                "lesson_name": lesson.name,
-                "is_locked": True
-            })
-            continue
-
-        progress = LessonProgress.objects.filter(user=user, lesson=lesson).first()
-
-        if not progress:
-            lesson_data.append({
-                "id": lesson.id,
-                "lesson_name": lesson.name,
-                "progress_percentage": 0.0,
-            })
-        else:
-            total_chapters = lesson.chapters.count()
-            completed_chapters = progress.current_chapter.number
-            progress_percentage = (completed_chapters / total_chapters) * 100 if total_chapters > 0 else 0.0
-
-            lesson_data.append({
-                "id": lesson.id,
-                "lesson_name": lesson.name,
-                "progress_percentage": round(progress_percentage, 2),
-                "current_chapter": progress.current_chapter.name if progress.current_chapter else None,
-                "current_part": progress.current_section.name if progress.current_section else None,
-            })
-
     class_obj = user.enrolled_class
+
+    # Fetch only required fields to optimize query performance
+    lessons = Lesson.objects.only("id", "name", "is_locked")
+
+    # Generate lesson data efficiently using list comprehension
+    lesson_data = [
+        {
+            "id": lesson.id,
+            "lesson_name": lesson.name,
+            "is_locked": lesson.is_locked,
+        }
+        for lesson in lessons
+    ]
 
     # Serialize class data
     class_data = {
         "id": class_obj.id,
+        "student_name": user.full_name,
         "name": class_obj.name,
         "teacher": class_obj.teacher.full_name,
         "class_code": class_obj.class_code,
-        "lessons": lesson_data
+        "lessons": lesson_data,
     }
 
     return Response(class_data, status=status.HTTP_200_OK)
@@ -123,7 +116,8 @@ def initial_exam_taken(request):
     if user.enrolled_class:
         exists = AssessmentResult.objects.filter(
             assessment__class_owner=user.enrolled_class,
-            assessment__is_initial=True
+            assessment__is_initial=True,
+            user=user
         ).exists()
 
         return Response({'taken': exists}, status=status.HTTP_200_OK)

@@ -2,6 +2,7 @@ from django.urls import path
 from api.views import student_views
 
 urlpatterns = [
+    path('joined-class', student_views.joined_class, name='student_joined_class'),
     path('class', student_views.get_class, name='get_student_class'),
     path('class/join', student_views.join_class, name='join_class'),
     path('initial-exam', student_views.get_initial_exam, name='get_initial_exam'),
