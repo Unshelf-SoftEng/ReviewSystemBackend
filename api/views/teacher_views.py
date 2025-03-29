@@ -1,4 +1,3 @@
-from pyasn1_modules.rfc2315 import data
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -16,7 +15,7 @@ def create_initial_assessment(request, class_id):
     user: User = request.user
 
     # Load question IDs from file
-    file_path = os.path.join(os.path.dirname(__file__), "question_ids.txt")
+    file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "question_ids.txt")
     try:
         with open(file_path, "r") as file:
             question_ids = [line.strip() for line in file if line.strip()]
@@ -61,7 +60,7 @@ def create_class(request):
     # Create class and save students
     new_class = Class.objects.create(name=class_name, teacher=user)
 
-    file_path = os.path.join(os.path.dirname(__file__), "question_ids.txt")
+    file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "question_ids.txt")
     try:
         with open(file_path, "r") as file:
             question_ids = [line.strip() for line in file if line.strip()]

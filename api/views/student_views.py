@@ -438,11 +438,11 @@ def submit_assessment(request, assessment_id):
     if assessment is None:
         return Response({'error': 'Assessment does not exist'}, status=status.HTTP_404_NOT_FOUND)
 
-    if assessment.source == 'student_generated' and assessment.created_by != user:
+    if assessment.source == 'student_initiated' and assessment.created_by != user:
         return Response({'error': 'You are not allowed to submit answers on this assessment'},
                         status=status.HTTP_403_FORBIDDEN)
     else:
-        if assessment.class_owner != user.enrolled_class:
+        if assessment.class_owner and user.enrolled_class and assessment.class_owner != user.enrolled_class:
             return Response({'error': 'You are not allowed to submit answers on this assessment'},
                             status=status.HTTP_403_FORBIDDEN)
 
@@ -795,7 +795,7 @@ def get_chapter(request, lesson_id, chapter_id):
         "sections": section_data
     }
 
-    return Response(chapter_data, status=status.HTTP_404_NOT_FOUND)
+    return Response(chapter_data, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
