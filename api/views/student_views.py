@@ -309,7 +309,7 @@ def take_lesson_assessment(request, lesson_id):
     selected_questions = random.sample(list(all_questions), no_of_questions)
 
     # TODO: Delete Afterwards
-    selected_questions = Question.objects.filter(id='24-A-37')
+    selected_questions = Question.objects.filter(id='24-A-43')
 
     lesson_assessment = Assessment.objects.create(
         name=f'Lesson Quiz: {lesson.name}',
