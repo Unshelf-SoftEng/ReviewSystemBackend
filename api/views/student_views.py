@@ -457,16 +457,21 @@ def submit_assessment(request, assessment_id):
 
     assessment_progress = AssessmentProgress.objects.filter(user=user, assessment_id=assessment_id).first()
 
+    is_auto_submission = False
     if assessment.deadline or assessment.time_limit:
         if assessment_progress:
             time_elapsed = (current_time - assessment_progress.start_time).total_seconds()
-            is_auto_submission = assessment.time_limit and time_elapsed >= assessment.time_limit
+            end_time = assessment_progress.start_time + timedelta(seconds=assessment.time_limit)
+            is_auto_submission = (
+                    (assessment.time_limit and time_elapsed >= assessment.time_limit) or
+                    (assessment.deadline and end_time >= assessment.deadline)
+            )
         else:
             is_auto_submission = False
 
-        if not is_auto_submission and assessment.deadline and current_time > assessment.deadline:
-            return Response({'error': 'The deadline for this assessment has already passed.'},
-                            status=status.HTTP_400_BAD_REQUEST)
+    if not is_auto_submission and assessment.deadline and current_time > assessment.deadline:
+        return Response({'error': 'The deadline for this assessment has already passed.'},
+                        status=status.HTTP_400_BAD_REQUEST)
 
     answers = request.data.get('answers', [])
 
