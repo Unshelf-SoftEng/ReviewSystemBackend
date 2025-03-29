@@ -481,13 +481,13 @@ def submit_assessment(request, assessment_id):
             ):
                 is_auto_submission = True
 
-        # 🚨 Block manual submission if past the strict limit (no grace period)
-        if not is_auto_submission and (
-                (assessment.time_limit and current_time >= end_time) or
-                (assessment.deadline and current_time >= deadline_time)
-        ):
-            return Response({'error': 'Submission not allowed. Time limit or deadline exceeded.'},
-                            status=status.HTTP_400_BAD_REQUEST)
+            # 🚨 Block manual submission if past the strict limit (no grace period)
+            if not is_auto_submission and (
+                    (assessment.time_limit and current_time >= end_time) or
+                    (assessment.deadline and current_time >= deadline_time)
+            ):
+                return Response({'error': 'Submission not allowed. Time limit or deadline exceeded.'},
+                                status=status.HTTP_400_BAD_REQUEST)
 
     answers = request.data.get('answers', [])
 
