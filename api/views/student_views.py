@@ -557,27 +557,26 @@ def get_assessment_result(request, assessment_id):
     category_stats = defaultdict(lambda: {'total_questions': 0, 'correct_answers': 0, 'wrong_answers': 0})
 
     serialized_answers = []
-    if not result.assessment.is_initial:
-        for answer in answers:
-            category_name = answer.question.category.name
-            category_stats[category_name]['total_questions'] += 1
+    for answer in answers:
+        category_name = answer.question.category.name
+        category_stats[category_name]['total_questions'] += 1
 
-            if answer.is_correct:
-                category_stats[category_name]['correct_answers'] += 1
-                overall_correct_answers += 1
-            else:
-                category_stats[category_name]['wrong_answers'] += 1
-                overall_wrong_answers += 1
+        if answer.is_correct:
+            category_stats[category_name]['correct_answers'] += 1
+            overall_correct_answers += 1
+        else:
+            category_stats[category_name]['wrong_answers'] += 1
+            overall_wrong_answers += 1
 
-            serialized_answers.append({
-                'question_id': answer.question.id,
-                'question_text': answer.question.question_text,
-                'choices': answer.question.choices if isinstance(answer.question.choices, list) else list(
-                    answer.question.choices.values()),
-                'chosen_answer': answer.chosen_answer,
-                'is_correct': answer.is_correct,
-                'time_spent': answer.time_spent,
-            })
+        serialized_answers.append({
+            'question_id': answer.question.id,
+            'question_text': answer.question.question_text,
+            'choices': answer.question.choices if isinstance(answer.question.choices, list) else list(
+                answer.question.choices.values()),
+            'chosen_answer': answer.chosen_answer,
+            'is_correct': answer.is_correct,
+            'time_spent': answer.time_spent,
+        })
 
     categories = [
         {
