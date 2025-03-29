@@ -704,6 +704,7 @@ def get_history(request):
 @api_view(['GET'])
 @auth_required("student")
 def get_lessons(request):
+    user: User = request.user
     lessons = Lesson.objects.only("id", "name", "is_locked")
 
     # Generate lesson data efficiently using list comprehension
@@ -716,7 +717,12 @@ def get_lessons(request):
         for lesson in lessons
     ]
 
-    return Response(lesson_data, status=status.HTTP_200_OK)
+    response_data = {
+        "student_name": user.full_name,
+        "lessons": lesson_data
+    }
+
+    return Response(response_data, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
