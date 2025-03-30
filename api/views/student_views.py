@@ -27,6 +27,23 @@ def joined_class(request):
     return Response(response_data, status=status.HTTP_200_OK)
 
 
+@api_view(['GET'])
+@auth_required("student")
+def get_initial_assessment_id(request):
+    user: User = request.user
+
+    initial_assessment = Assessment.objects.filter(class_owner=user.enrolled_class, is_initial=True)
+
+    if not initial_assessment.exists():
+        return Response({'error': 'Initial exam for class not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    response_data = {
+        'assessment_id': initial_assessment.id
+    }
+
+    return Response(response_data, status=status.HTTP_200_OK)
+
+
 @api_view(["GET"])
 @auth_required("student")
 def get_class(request):
@@ -680,7 +697,8 @@ def get_history(request):
             categories.append({
                 'category_name': category.name,
                 'correct_answer': correct_answers,
-                'wrong_answer': wrong_answers
+                'wrong_answer': wrong_answers,
+                'percentage': (correct_answers / (correct_answers + wrong_answers) * 100) if (correct_answers + wrong_answers) > 0 else 0
             })
 
         item = {
@@ -701,7 +719,7 @@ def get_history(request):
 
 @api_view(['GET'])
 @auth_required("student")
-def get_lessons(request):
+def get_dashboard_data(request):
     user: User = request.user
     lessons = Lesson.objects.only("id", "name", "is_locked")
 
@@ -715,9 +733,46 @@ def get_lessons(request):
         for lesson in lessons
     ]
 
+    assessment_results = AssessmentResult.objects.filter(user__id=user.id).order_by('-created_at')
+
+    history_data = []
+    for result in assessment_results:
+        selected_categories = result.assessment.selected_categories.all()
+        categories = []
+
+        for category in selected_categories:
+            answers = Answer.objects.filter(
+                assessment_result=result,
+                question__category=category
+            )
+
+            correct_answers = answers.filter(is_correct=True).count()
+            wrong_answers = answers.filter(is_correct=False).count()
+
+            categories.append({
+                'category_name': category.name,
+                'correct_answer': correct_answers,
+                'wrong_answer': wrong_answers
+            })
+
+        item = {
+            'assessment_id': result.assessment.id,
+            'type': result.assessment.type,
+            'score': result.score,
+            'total_items': result.assessment.questions.count(),
+            'time_taken': result.time_taken,
+            'date_taken': result.assessment.created_at,
+            'question_source': result.assessment.question_source,
+            'source': result.assessment.source,
+            'categories': categories,
+            'is_initial_assessment': result.assessment.is_initial
+        }
+        history_data.append(item)
+
     response_data = {
         "student_name": user.full_name,
-        "lessons": lesson_data
+        "lessons": lesson_data,
+        "history": history_data
     }
 
     return Response(response_data, status=status.HTTP_200_OK)
