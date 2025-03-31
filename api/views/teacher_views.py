@@ -2,7 +2,8 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from ..models import User, Class, UserAbility, Assessment, AssessmentResult, Question, AssessmentProgress, Lesson, \
-    Chapter
+    Chapter, Answer
+from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
 from django.utils.dateparse import parse_datetime
 from api.decorators import auth_required
@@ -211,7 +212,7 @@ def get_student_data(request, student_id):
 @api_view(['GET'])
 @auth_required("teacher")
 def get_all_questions(request):
-    questions = Question.objects.select_related('category').values('id', 'question_text', 'category__name')
+    questions = Question.objects.select_related('category').values('id', 'question_text', 'image_url', 'choices', 'category__name')
 
     return Response(list(questions), status=status.HTTP_200_OK)
 
@@ -341,6 +342,140 @@ def get_assessment_results(request, assessment_id):
         "average_score": average_score,
         "students_data": students_data,
     }, status=status.HTTP_200_OK)
+
+# @api_view(['GET'])
+# @auth_required("teacher")
+# def get_assessment_results(request, assessment_id):
+#     assessment = get_object_or_404(Assessment.objects.prefetch_related(
+#         Prefetch('questions', queryset=Question.objects.select_related('category')),
+#         Prefetch('assessment_results', queryset=AssessmentResult.objects.prefetch_related(
+#             Prefetch('answers', queryset=Answer.objects.select_related('question'))
+#         ))
+#     ), id=assessment_id)
+#
+#     students = User.objects.filter(enrolled_class=assessment.class_owner)
+#     students_data = []
+#     total_score = 0
+#     question_analysis = []
+#
+#     # Initialize question statistics with all possible states
+#     questions = assessment.questions.all()
+#     question_stats = {
+#         q.id: {
+#             'question_text': q.question_text,
+#             'category': q.category.name,
+#             'total_students': students.count(),
+#             'correct_count': 0,
+#             'wrong_count': 0,
+#             'skipped_count': 0,
+#             'blank_count': 0,  # Explicit blank answers
+#             'difficulty_percentage': 0.0,
+#             'answer_distribution': {}  # Track specific answer choices
+#         } for q in questions
+#     }
+#
+#     for student in students:
+#         assessment_result = next(
+#             (ar for ar in assessment.assessment_results.all() if ar.user_id == student.id),
+#             None
+#         )
+#
+#         student_data = {
+#             "student_id": student.id,
+#             "student_name": student.full_name,
+#             "taken": assessment_result is not None,
+#             "score": assessment_result.score if assessment_result else None,
+#             "answers": []
+#         }
+#
+#         if assessment_result:
+#             total_score += assessment_result.score
+#
+#             # Track answered questions
+#             answered_question_ids = set()
+#
+#             for answer in assessment_result.answers.all():
+#                 question_id = answer.question_id
+#                 answered_question_ids.add(question_id)
+#
+#                 # Update answer distribution
+#                 chosen_answer = str(answer.chosen_answer)
+#                 question_stats[question_id]['answer_distribution'].setdefault(chosen_answer, 0)
+#                 question_stats[question_id]['answer_distribution'][chosen_answer] += 1
+#
+#                 if answer.is_correct:
+#                     question_stats[question_id]['correct_count'] += 1
+#                 else:
+#                     question_stats[question_id]['wrong_count'] += 1
+#
+#                 student_data['answers'].append({
+#                     'question_id': question_id,
+#                     'is_correct': answer.is_correct,
+#                     'chosen_answer': answer.chosen_answer,
+#                     'time_spent': answer.time_spent,
+#                     'status': 'blank' if answer.chosen_answer in [None, ""] else 'answered'
+#                 })
+#
+#             # Track unanswered/skipped questions
+#             for question in questions:
+#                 if question.id not in answered_question_ids:
+#                     question_stats[question.id]['skipped_count'] += 1
+#                     student_data['answers'].append({
+#                         'question_id': question.id,
+#                         'is_correct': False,
+#                         'chosen_answer': None,
+#                         'time_spent': None,
+#                         'status': 'skipped'
+#                     })
+#
+#         else:
+#             # Student didn't take the assessment at all
+#             for question in questions:
+#                 question_stats[question.id]['skipped_count'] += 1
+#                 student_data['answers'].append({
+#                     'question_id': question.id,
+#                     'is_correct': False,
+#                     'chosen_answer': None,
+#                     'time_spent': None,
+#                     'status': 'not_attempted'
+#                 })
+#
+#         students_data.append(student_data)
+#
+#     # Calculate difficulty metrics and clean up data
+#     for q_id, stats in question_stats.items():
+#         total_attempted = stats['correct_count'] + stats['wrong_count']
+#
+#         if total_attempted > 0:
+#             stats['difficulty_percentage'] = round(
+#                 (1 - (stats['correct_count'] / total_attempted)) * 100,
+#                 2
+#             )
+#
+#         # Calculate blank answers from wrong_count (if needed)
+#         stats['blank_count'] = stats['answer_distribution'].get('', 0) + stats['answer_distribution'].get(None, 0)
+#
+#         # Remove temporary fields if needed
+#         stats.pop('total_students', None)
+#
+#     question_analysis = [
+#         {
+#             'question_id': q_id,
+#             **stats
+#         } for q_id, stats in question_stats.items()
+#     ]
+#
+#     average_score = total_score / students.count() if students.exists() else 0
+#
+#     return Response({
+#         "assessment_id": assessment.id,
+#         "assessment_name": assessment.name,
+#         "average_score": average_score,
+#         "total_students": students.count(),
+#         "students_attempted": sum(1 for s in students_data if s['taken']),
+#         "question_analysis": question_analysis,
+#         "students_data": students_data,
+#     }, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
