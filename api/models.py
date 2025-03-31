@@ -3,7 +3,6 @@ from .utils.util import generate_class_code
 
 
 class User(models.Model):
-    # User roles
     TEACHER = 'teacher'
     STUDENT = 'student'
     ADMIN = 'admin'
@@ -19,6 +18,8 @@ class User(models.Model):
     last_name = models.CharField(max_length=255, null=True)
     role = models.CharField(max_length=255, choices=USER_ROLES, default=STUDENT)
     enrolled_class = models.ForeignKey('Class', on_delete=models.SET_NULL, null=True, blank=True)
+    email_confirmed = models.BooleanField(default=False)
+    verification_sent_at = models.DateTimeField(null=True, blank=True)
 
     @property
     def full_name(self):
