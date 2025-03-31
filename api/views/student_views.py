@@ -2,6 +2,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 import random
+from django.db.models import Prefetch
 from django.utils import timezone
 from api.models import User, Question, Assessment, Answer, AssessmentResult, UserAbility, Category, Lesson, \
     LessonProgress, Class, AssessmentProgress, Chapter, Section
@@ -179,6 +180,7 @@ def take_initial_exam(request):
         return Response({'error': 'Student has already taken the exam.'}, status=status.HTTP_400_BAD_REQUEST)
 
     questions = list(exam.questions.values("id", "image_url", "question_text", "choices"))
+    random.shuffle(questions)
 
     exam_data = {
         'exam_id': exam.id,
@@ -549,45 +551,67 @@ def submit_assessment(request, assessment_id):
 
     return Response({'message': 'Assessment was submitted successfully'}, status=status.HTTP_201_CREATED)
 
-
 @api_view(['GET'])
 @auth_required("student")
 def get_assessment_result(request, assessment_id):
     user: User = request.user
 
-    result = AssessmentResult.objects.prefetch_related("answers__question__category").filter(
-        assessment__id=assessment_id, user=user).first()
+    # Optimized query with select_related and prefetch_related
+    result = AssessmentResult.objects.select_related('assessment', 'user').prefetch_related(
+        Prefetch('answers', queryset=Answer.objects.select_related('question__category')),
+        Prefetch('assessment__questions', queryset=Question.objects.select_related('category'))
+    ).filter(assessment__id=assessment_id, user=user).first()
+
 
     if result is None:
         return Response({'error': 'No Result for Assessment Found'}, status=status.HTTP_404_NOT_FOUND)
 
-    answers = list(result.answers.all())
+    answers = result.answers.all()
+    answer_dict = {ans.question.id: ans for ans in answers}
+
+    questions = result.assessment.questions.all()
 
     overall_correct_answers = 0
     overall_wrong_answers = 0
     category_stats = defaultdict(lambda: {'total_questions': 0, 'correct_answers': 0, 'wrong_answers': 0})
 
     serialized_answers = []
-    for answer in answers:
-        category_name = answer.question.category.name
+    for question in questions:
+
+        category_name = question.category.name
         category_stats[category_name]['total_questions'] += 1
 
-        if answer.is_correct:
-            category_stats[category_name]['correct_answers'] += 1
-            overall_correct_answers += 1
+        answer = answer_dict.get(question.id)
+
+        if answer:
+            if answer.is_correct:
+                category_stats[category_name]['correct_answers'] += 1
+                overall_correct_answers += 1
+            else:
+                category_stats[category_name]['wrong_answers'] += 1
+                overall_wrong_answers += 1
+
+            serialized_answers.append({
+                'question_id': answer.question.id,
+                'question_text': answer.question.question_text,
+                'choices': answer.question.choices if isinstance(answer.question.choices, list) else list(
+                    answer.question.choices.values()),
+                'chosen_answer': answer.chosen_answer,
+                'is_correct': answer.is_correct,
+                'time_spent': answer.time_spent,
+            })
         else:
             category_stats[category_name]['wrong_answers'] += 1
             overall_wrong_answers += 1
 
-        serialized_answers.append({
-            'question_id': answer.question.id,
-            'question_text': answer.question.question_text,
-            'choices': answer.question.choices if isinstance(answer.question.choices, list) else list(
-                answer.question.choices.values()),
-            'chosen_answer': answer.chosen_answer,
-            'is_correct': answer.is_correct,
-            'time_spent': answer.time_spent,
-        })
+            serialized_answers.append({
+                'question_id': question.id,
+                'question_text': question.question_text,
+                'choices': question.choices if isinstance(question.choices, list) else list(question.choices.values()),
+                'chosen_answer': None,
+                'is_correct': False,
+                'time_spent': None,
+            })
 
     categories = [
         {
@@ -605,7 +629,7 @@ def get_assessment_result(request, assessment_id):
         'categories': categories,
         'overall_correct_answers': overall_correct_answers,
         'overall_wrong_answers': overall_wrong_answers,
-        'total_questions': result.assessment.questions.count(),  # Optimized counting
+        'total_questions': questions.count(),
         'answers': serialized_answers,
     }
 
