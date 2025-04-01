@@ -306,6 +306,11 @@ def get_assessment_data(request, assessment_id):
     return Response(response_data, status=status.HTTP_200_OK)
 
 
+import time
+from django.db import connection
+from django.db import reset_queries
+
+
 @api_view(['GET'])
 @auth_required("teacher")
 def get_assessment_results_students(request, assessment_id):
@@ -315,35 +320,29 @@ def get_assessment_results_students(request, assessment_id):
         is_active=True
     )
 
+    section_start = time.time()
     students = User.objects.filter(
         enrolled_class=assessment.class_owner
     ).select_related('enrolled_class')
-
-    student_ids = students.values_list('id', flat=True)
+    student_ids = list(students.values_list('id', flat=True))
 
     results_stats = AssessmentResult.objects.filter(
         assessment=assessment
     ).values('user_id').annotate(
-        score=Max('score'),  # Assuming one result per student
+        score=Max('score'),
         time_taken=Max('time_taken'),
         total_answers=Count('answers'),
         correct=Count('answers', filter=Q(answers__is_correct=True)),
         wrong=Count('answers', filter=Q(answers__is_correct=False)),
         blank=Count('answers', filter=Q(answers__chosen_answer=''))
     )
-
-    # Convert to dictionary for easy lookup
     results_dict = {stat['user_id']: stat for stat in results_stats}
 
     students_data = []
     total_score = 0
     students_with_results = 0
-    count = 1
 
     for student in students:
-        print(f'Processing Student {count}:', student.full_name)
-        count += 1
-
         stat = results_dict.get(student.id)
         if stat:
             students_data.append({
@@ -365,14 +364,16 @@ def get_assessment_results_students(request, assessment_id):
                 "taken": False
             })
 
-    return Response({
+    response_data = {
         "assessment_id": assessment.id,
         "assessment_name": assessment.name,
-        "average_score": round(total_score / students_with_results) if students_with_results else 0,
-        "students_data": students_data,  # Changed to match questions endpoint pattern
         "total_students": len(student_ids),
-        "students_taken": students_with_results
-    }, status=status.HTTP_200_OK)
+        "students_taken": students_with_results,
+        "average_score": round(total_score / students_with_results) if students_with_results else 0,
+        "students_data": students_data,
+    }
+
+    return Response(response_data, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
