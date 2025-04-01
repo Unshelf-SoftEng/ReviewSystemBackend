@@ -717,7 +717,7 @@ def get_dashboard_data(request):
         for lesson in lessons
     ]
 
-    assessment_results = AssessmentResult.objects.filter(user__id=user.id).order_by('-created_at')
+    assessment_results = AssessmentResult.objects.filter(user__id=user.id).order_by('-start_time')
 
     history_data = []
     for result in assessment_results:
