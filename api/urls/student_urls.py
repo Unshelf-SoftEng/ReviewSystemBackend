@@ -8,6 +8,7 @@ urlpatterns = [
     path('initial-exam', student_views.get_initial_exam, name='get_initial_exam'),
     path('take-initial-exam', student_views.take_initial_exam, name='take_initial_exam'),
     path('initial-exam-taken', student_views.initial_exam_taken, name='initial_exam_taken'),
+    path('assessment/<int:assessment_id>/save-progress', student_views.save_progress, name='save_progress'),
     path('assessment/<int:assessment_id>/time-limit', student_views.check_time_limit, name='check_time_limit'),
     path('assessment/<int:assessment_id>/take', student_views.take_teacher_assessment, name='take_teacher_assessment'),
     path('exam/take', student_views.take_exam, name='take_exam'),

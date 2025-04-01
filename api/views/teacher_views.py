@@ -1,7 +1,7 @@
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from ..models import User, Class, UserAbility, Assessment, AssessmentResult, Question, Lesson, Chapter
+from ..models import User, Class, UserAbility, Assessment, AssessmentResult, Question, Lesson, Chapter, Answer
 from django.shortcuts import get_object_or_404
 from django.utils.dateparse import parse_datetime
 from api.decorators import auth_required
@@ -174,7 +174,7 @@ def get_student_data(request, student_id):
     user_ability = UserAbility.objects.filter(user_id=student_id)
     stored_abilities = {user_ability.category.name: user_ability.irt_ability for user_ability in user_ability}
 
-    assessment_results = AssessmentResult.objects.filter(user=student)
+    assessment_results = AssessmentResult.objects.filter(user=student).prefetch_related("assessment")
 
     history = []
     for assessment_result in assessment_results:
@@ -189,7 +189,6 @@ def get_student_data(request, student_id):
             'date_taken': assessment.created_at,
             'categories': [category.name for category in assessment.selected_categories.all()]
         }
-
         history.append(item)
 
     return Response({
@@ -202,7 +201,8 @@ def get_student_data(request, student_id):
 @api_view(['GET'])
 @auth_required("teacher")
 def get_all_questions(request):
-    questions = Question.objects.select_related('category').values('id', 'question_text', 'image_url', 'choices', 'category__name')
+    questions = Question.objects.select_related('category').values('id', 'question_text', 'image_url', 'choices',
+                                                                   'category__name')
 
     return Response(list(questions), status=status.HTTP_200_OK)
 
@@ -214,7 +214,8 @@ def create_assessment(request, class_id):
     class_obj = get_object_or_404(Class, id=class_id)
 
     if class_obj.teacher != user:
-        return Response({"error": "Teacher cannot create quiz to class it didn't create"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": "Teacher cannot create quiz to class it didn't create"},
+                        status=status.HTTP_400_BAD_REQUEST)
 
     question_source = request.data.get('question_source')
     questions = request.data.get('questions')
@@ -277,7 +278,6 @@ def get_class_assessments(request, class_id):
 @api_view(['GET'])
 @auth_required("teacher")
 def get_assessment_data(request, assessment_id):
-
     assessment = get_object_or_404(
         Assessment.objects.prefetch_related("questions"),
         id=assessment_id,
@@ -313,16 +313,35 @@ def get_assessment_results(request, assessment_id):
     total_score = 0
 
     for student in students:
-        assessment_result = AssessmentResult.objects.filter(assessment=assessment, user=student).first()
+        result = AssessmentResult.objects.filter(assessment=assessment, user=student).first()
 
-        if assessment_result:
+        if result:
+            # Calculate the number of correct, wrong, skipped, and unanswered answers
+            answers = Answer.objects.filter(assessment_result=result)
+            correct_answers = answers.filter(is_correct=True).count()
+            wrong_answers = answers.filter(is_correct=False).count()
+
+            # For skipped, check if the answer doesn't exist for a question
+            skipped = 0
+            total_questions = assessment.questions.all()
+            for question in total_questions:
+                if not Answer.objects.filter(assessment_result=result, question=question).exists():
+                    skipped += 1
+
+            # For did_not_answer, check if the chosen_answer is an empty string
+            did_not_answer = answers.filter(chosen_answer="").count()
+
             students_data.append({
                 "student_id": student.id,
                 "student_name": student.full_name,
                 "taken": True,
-                "score": assessment_result.score
+                "score": result.score,
+                "correct_answers": correct_answers,
+                "wrong_answers": wrong_answers,
+                "didn't_answer": did_not_answer,
+                "skipped": skipped
             })
-            total_score += assessment_result.score
+            total_score += result.score
         else:
             students_data.append({
                 "student_id": student.id,
@@ -332,11 +351,59 @@ def get_assessment_results(request, assessment_id):
 
     average_score = total_score / students.count() if students.exists() else 0
 
+    questions = assessment.questions.all()
+    questions_data = []
+
+    for question in questions:
+        answers = Answer.objects.filter(question=question)
+        answer_counts = {
+            'a': 0,
+            'b': 0,
+            'c': 0,
+            'd': 0,
+            'did_not_answer': 0,
+            'skipped': 0,
+            'correct_answers': 0,
+            'wrong_answers': 0
+        }
+
+        for answer in answers:
+            # Count how many times each choice was selected
+            if answer.chosen_answer == 'a':
+                answer_counts['a'] += 1
+            elif answer.chosen_answer == 'b':
+                answer_counts['b'] += 1
+            elif answer.chosen_answer == 'c':
+                answer_counts['c'] += 1
+            elif answer.chosen_answer == 'd':
+                answer_counts['d'] += 1
+            elif answer.chosen_answer == '':
+                answer_counts['did_not_answer'] += 1
+
+            # Count the correct and wrong answers
+            if answer.is_correct:
+                answer_counts['correct_answers'] += 1
+            else:
+                answer_counts['wrong_answers'] += 1
+
+        questions_data.append({
+            "question_id": question.id,
+            "a": answer_counts['a'],
+            "b": answer_counts['b'],
+            "c": answer_counts['c'],
+            "d": answer_counts['d'],
+            "did_not_answer": answer_counts['did_not_answer'],
+            "skipped": answer_counts['skipped'],
+            "correct_answers": answer_counts['correct_answers'],
+            "wrong_answers": answer_counts['wrong_answers']
+        })
+
     return Response({
         "assessment_id": assessment.id,
         "assessment_name": assessment.name,
         "average_score": average_score,
         "students_data": students_data,
+        "questions_data": questions_data
     }, status=status.HTTP_200_OK)
 
 
@@ -392,7 +459,6 @@ def get_lessons(request):
 @api_view(['GET'])
 @auth_required("teacher")
 def get_lesson(request, lesson_id):
-
     lesson = get_object_or_404(
         Lesson.objects.prefetch_related("chapters__sections"),
         id=lesson_id
@@ -414,16 +480,16 @@ def get_lesson(request, lesson_id):
             "is_main_chapter": chapter.is_main_chapter,
             "is_locked": chapter.is_locked,
             "structure": (
-                [
-                    {
-                        "section_id": section.id,
-                        "section_number": section.number,
-                        "section_name": section.name,
-                    }
-                    for section in chapter.sections.all()
-                ] + (
-                    [{"type": "quiz", "title": f"Quiz for {chapter.name}"}] if chapter.is_main_chapter else []
-                )
+                    [
+                        {
+                            "section_id": section.id,
+                            "section_number": section.number,
+                            "section_name": section.name,
+                        }
+                        for section in chapter.sections.all()
+                    ] + (
+                        [{"type": "quiz", "title": f"Quiz for {chapter.name}"}] if chapter.is_main_chapter else []
+                    )
             ) if not chapter.is_locked else None
         }
         for chapter in lesson.chapters.all()
@@ -479,7 +545,8 @@ def get_lesson_quiz_data(request, class_id, lesson_id):
     students = User.objects.filter(enrolled_class_id=class_id)
     lesson = get_object_or_404(Lesson, id=lesson_id)
     assessments = Assessment.objects.filter(lesson=lesson, class_owner__id=class_id, is_active=True)
-    assessment_results = AssessmentResult.objects.filter(assessment__in=assessments, user__in=students).select_related("assessment")
+    assessment_results = AssessmentResult.objects.filter(assessment__in=assessments, user__in=students).select_related(
+        "assessment")
     assessment_results_lookup = {ar.user_id: ar for ar in assessment_results}
 
     students_data = []
@@ -522,7 +589,8 @@ def get_chapter_quiz(request, class_id, chapter_id):
     chapter = get_object_or_404(Chapter.objects.select_related("lesson"), id=chapter_id)
     students = User.objects.filter(enrolled_class_id=class_id)
     assessments = Assessment.objects.filter(chapter=chapter, class_owner_id=class_id)
-    assessment_results = AssessmentResult.objects.filter(assessment__in=assessments, user__in=students).select_related("assessment")
+    assessment_results = AssessmentResult.objects.filter(assessment__in=assessments, user__in=students).select_related(
+        "assessment")
     assessment_results_lookup = {ar.user_id: ar for ar in assessment_results}
 
     students_data = []

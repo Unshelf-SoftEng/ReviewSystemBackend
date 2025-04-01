@@ -132,6 +132,9 @@ class AssessmentResult(models.Model):
     last_activity = models.DateTimeField(auto_now=True)
     is_submitted = models.BooleanField(default=False)
 
+    class Meta:
+        unique_together = ('assessment', 'user')
+
     def __str__(self):
         return f'{self.user} scored {self.score} on {self.assessment}'
 
@@ -140,11 +143,14 @@ class AssessmentResult(models.Model):
 
 
 class Answer(models.Model):
-    assessment_result = models.ForeignKey(AssessmentResult, related_name='answers', on_delete=models.CASCADE)
-    question = models.ForeignKey(Question, related_name='answers', on_delete=models.CASCADE)
-    time_spent = models.IntegerField(default=0, editable=False)
+    assessment_result = models.ForeignKey(AssessmentResult, on_delete=models.CASCADE, related_name='answers')
+    question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='answers')
     chosen_answer = models.TextField()
+    time_spent = models.IntegerField(default=0)
     is_correct = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ('assessment_result', 'question')
 
     def __str__(self):
         return f'Answer for {self.question.question_text} by {self.assessment_result.user}'
