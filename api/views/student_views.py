@@ -28,23 +28,6 @@ def joined_class(request):
     return Response(response_data, status=status.HTTP_200_OK)
 
 
-@api_view(['GET'])
-@auth_required("student")
-def get_initial_assessment_id(request):
-    user: User = request.user
-
-    initial_assessment = Assessment.objects.filter(class_owner=user.enrolled_class, is_initial=True)
-
-    if not initial_assessment.exists():
-        return Response({'error': 'Initial exam for class not found'}, status=status.HTTP_404_NOT_FOUND)
-
-    response_data = {
-        'assessment_id': initial_assessment.id
-    }
-
-    return Response(response_data, status=status.HTTP_200_OK)
-
-
 @api_view(["GET"])
 @auth_required("student")
 def get_class(request):
@@ -147,14 +130,15 @@ def initial_exam_taken(request):
 @auth_required("student")
 def take_initial_exam(request):
     user: User = request.user
+    current_time = timezone.now()
 
     exam = Assessment.objects.filter(
         class_owner=user.enrolled_class, is_initial=True
     ).select_related("class_owner").prefetch_related("questions").only("id", "time_limit", "deadline",
                                                                        "class_owner").first()
+
     if user.enrolled_class is None:
-        return Response({'error': "You are not enrolled in any class"}, status=status.HTTP_403_FORBIDDEN
-                        )
+        return Response({'error': "You are not enrolled in any class"}, status=status.HTTP_403_FORBIDDEN)
 
     if not exam:
         return Response({"error": "Can't find initial exam"}, status=status.HTTP_404_NOT_FOUND)
@@ -162,21 +146,22 @@ def take_initial_exam(request):
     if not exam.deadline:
         return Response({'error': 'Exam is not yet open'}, status=status.HTTP_400_BAD_REQUEST)
 
-    if exam.deadline < timezone.now():
+    if exam.deadline < current_time:
         return Response({'error': 'Exam deadline has already passed'}, status=status.HTTP_400_BAD_REQUEST)
 
-    progress, created = AssessmentProgress.objects.get_or_create(
+    result, created = AssessmentResult.objects.get_or_create(
         assessment=exam, user=user,
-        defaults={"start_time": timezone.now()}
+        defaults={"start_time": current_time}
     )
 
-    end_time = progress.start_time + timedelta(seconds=exam.time_limit)
-    remaining_time = (end_time - timezone.now()).total_seconds()
+    expected_end_time = result.start_time + timedelta(seconds=exam.time_limit)
+    end_time = min(expected_end_time, exam.deadline)
+    remaining_time = (end_time - current_time).total_seconds()
 
     if remaining_time <= 0:
         return Response({'error': 'Time limit has exceeded'}, status=status.HTTP_400_BAD_REQUEST)
 
-    if AssessmentResult.objects.filter(assessment=exam, user=user).exists():
+    if result.is_submitted:
         return Response({'error': 'Student has already taken the exam.'}, status=status.HTTP_400_BAD_REQUEST)
 
     questions = list(exam.questions.values("id", "image_url", "question_text", "choices"))
@@ -216,6 +201,7 @@ def take_exam(request):
     selected_questions = list(Question.objects.order_by('?')[no_of_items:])
 
     exam = Assessment.objects.create(
+        name=f"Practice Exam ({now().strftime('%Y-%m-%d %H:%M')})",
         created_by=user,
         type='exam',
         source='student_initiated',
@@ -281,6 +267,7 @@ def take_quiz(request):
     categories = Category.objects.filter(id__in=selected_categories)
 
     quiz = Assessment.objects.create(
+        name=f"Practice Quiz ({now().strftime('%Y-%m-%d %H:%M')})",
         created_by=user,
         type='quiz',
         question_source=question_source,
@@ -443,27 +430,37 @@ def check_time_limit(request, assessment_id):
     if assessment.time_limit is None:
         return Response({'error': 'No time limit.'}, status=status.HTTP_404_NOT_FOUND)
 
-    progress = AssessmentProgress.objects.filter(user=user, assessment_id=assessment_id).first()
+    result = AssessmentResult.objects.filter(user=user, assessment_id=assessment_id).first()
 
-    if progress is None:
+    if result is None:
         return Response({'error': "No progress found for this assessment."}, status=status.HTTP_404_NOT_FOUND)
 
-    elapsed_time = (timezone.now() - progress.start_time).total_seconds()
-    total_time_allowed = progress.assessment.time_limit
-    time_left = total_time_allowed - elapsed_time
+    current_time = timezone.now()
+    elapsed_time = (current_time - result.start_time).total_seconds()
+    time_limit = result.assessment.time_limit
+    deadline = result.assessment.deadline
 
-    if elapsed_time > total_time_allowed:
-        return Response({'error': 'Time limit exceeded.'}, status=status.HTTP_400_BAD_REQUEST)
+    if deadline:
+        remaining_time_until_deadline = (deadline - current_time).total_seconds()
+    else:
+        remaining_time_until_deadline = float('inf')  # No deadline, so no restriction
 
-    return Response({"time_left": int(time_left)}, status=status.HTTP_200_OK)
+    remaining_time_based_on_limit = time_limit - elapsed_time
+
+    remaining_time = min(remaining_time_based_on_limit, remaining_time_until_deadline)
+
+    if remaining_time <= 0:
+        return Response({'error': 'Time limit exceeded.'}, status=status.HTTP_404_NOT_FOUND)
+
+    return Response({"time_left": int(remaining_time)}, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
 @auth_required("student")
 def submit_assessment(request, assessment_id):
     user: User = request.user
-    assessment = Assessment.objects.filter(id=assessment_id).first()
     current_time = timezone.now()
+    assessment = Assessment.objects.filter(id=assessment_id).first()
 
     if assessment is None:
         return Response({'error': 'Assessment does not exist'}, status=status.HTTP_404_NOT_FOUND)
@@ -476,33 +473,28 @@ def submit_assessment(request, assessment_id):
             return Response({'error': 'You are not allowed to submit answers on this assessment'},
                             status=status.HTTP_403_FORBIDDEN)
 
-    if AssessmentResult.objects.filter(assessment=assessment, user=user).exists():
-        return Response({'error': 'Exam was already taken.'}, status=status.HTTP_400_BAD_REQUEST)
+    result = AssessmentResult.objects.filter(user=user, assessment_id=assessment_id).first()
 
-    assessment_progress = AssessmentProgress.objects.filter(user=user, assessment_id=assessment_id).first()
+    if result.is_submitted:
+        return Response({'error': 'Exam was already submitted.'}, status=status.HTTP_400_BAD_REQUEST)
 
     is_auto_submission = False
 
-    if assessment_progress:
-        time_elapsed = (current_time - assessment_progress.start_time).total_seconds()
-        end_time = assessment_progress.start_time + timedelta(
-            seconds=assessment.time_limit) if assessment.time_limit else None
+    if assessment.time_limit or assessment.deadline:
+        end_time = result.start_time + timedelta(seconds=assessment.time_limit) if assessment.time_limit else None
         deadline_time = assessment.deadline if assessment.deadline else None
 
-        # Check if we are within the auto-submission window (grace period before limit)
-        if (
-                (assessment.time_limit and current_time >= end_time - timedelta(
-                    seconds=AUTO_SUBMISSION_GRACE_PERIOD)) or
-                (assessment.deadline and current_time >= deadline_time - timedelta(
-                    seconds=AUTO_SUBMISSION_GRACE_PERIOD))
-        ):
+        if end_time and deadline_time:
+            final_end_time = min(end_time, deadline_time)
+        elif end_time:
+            final_end_time = end_time
+        else:
+            final_end_time = deadline_time
+
+        if current_time >= final_end_time - timedelta(seconds=AUTO_SUBMISSION_GRACE_PERIOD):
             is_auto_submission = True
 
-        # 🚨 Block manual submission if past the strict limit (no grace period)
-        if not is_auto_submission and (
-                (assessment.time_limit and current_time >= end_time) or
-                (assessment.deadline and current_time >= deadline_time)
-        ):
+        if not is_auto_submission and current_time >= final_end_time:
             return Response({'error': 'Submission not allowed. Time limit or deadline exceeded.'},
                             status=status.HTTP_400_BAD_REQUEST)
 
@@ -511,16 +503,7 @@ def submit_assessment(request, assessment_id):
     if not answers:
         return Response({'error': 'No answers provided.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    assessment_result = AssessmentResult.objects.create(
-        assessment=assessment,
-        user=user,
-        score=0,
-        created_at=current_time
-    )
-
-    if assessment_progress:
-        assessment_result.time_taken = (current_time - assessment_progress.start_time).seconds
-        assessment_result.save()
+    result.time_take = (current_time - result.start_time).seconds
 
     assessment_questions = {q.id: q for q in assessment.questions.all()}
     answer_dict = {a["question_id"]: a for a in answers}
@@ -539,7 +522,7 @@ def submit_assessment(request, assessment_id):
             score += int(is_correct)
 
             answers_to_create.append(Answer(
-                assessment_result=assessment_result,
+                assessment_result=result,
                 question=question,
                 time_spent=time_spent,
                 chosen_answer=chosen_answer,
@@ -547,7 +530,8 @@ def submit_assessment(request, assessment_id):
             ))
 
     Answer.objects.bulk_create(answers_to_create)
-    AssessmentResult.objects.filter(id=assessment_result.id).update(score=score)
+    result.score = score
+    result.is_submitted = True
 
     return Response({'message': 'Assessment was submitted successfully'}, status=status.HTTP_201_CREATED)
 
@@ -722,7 +706,8 @@ def get_history(request):
                 'category_name': category.name,
                 'correct_answer': correct_answers,
                 'wrong_answer': wrong_answers,
-                'percentage': (correct_answers / (correct_answers + wrong_answers) * 100) if (correct_answers + wrong_answers) > 0 else 0
+                'percentage': (correct_answers / (correct_answers + wrong_answers) * 100) if (
+                                                                                                         correct_answers + wrong_answers) > 0 else 0
             })
 
         item = {

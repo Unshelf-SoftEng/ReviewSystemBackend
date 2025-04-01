@@ -127,13 +127,18 @@ class AssessmentProgress(models.Model):
 
 class AssessmentResult(models.Model):
     assessment = models.ForeignKey(Assessment, on_delete=models.CASCADE)
-    score = models.IntegerField(default=0)
-    time_taken = models.IntegerField(default=0, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    score = models.IntegerField(default=0)
+    start_time = models.DateTimeField(auto_now_add=True)
+    time_taken = models.IntegerField(default=0, editable=False)
+    last_activity = models.DateTimeField(auto_now=True)
+    is_submitted = models.BooleanField(default=False)
 
     def __str__(self):
         return f'{self.user} scored {self.score} on {self.assessment}'
+
+    def get_time_taken(self):
+        return (self.last_activity - self.start_time).seconds
 
 
 class Answer(models.Model):

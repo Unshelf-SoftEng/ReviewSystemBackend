@@ -132,6 +132,7 @@ def register_user(request):
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+
 @api_view(['POST'])
 def login_user(request):
     data = request.data
