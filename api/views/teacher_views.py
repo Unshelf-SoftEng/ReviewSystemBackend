@@ -1,11 +1,13 @@
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from ..models import User, Class, UserAbility, Assessment, AssessmentResult, Question, Lesson, Chapter, Answer
 from django.shortcuts import get_object_or_404
 from django.utils.dateparse import parse_datetime
+from django.db.models import Count, Q, Avg, Max, Prefetch
+from api.models import User, Class, UserAbility, Assessment, AssessmentResult, Question, Lesson, Chapter, Answer
 from api.decorators import auth_required
 import os
+from collections import defaultdict
 
 
 @api_view(['GET'])
@@ -306,103 +308,122 @@ def get_assessment_data(request, assessment_id):
 
 @api_view(['GET'])
 @auth_required("teacher")
-def get_assessment_results(request, assessment_id):
-    assessment = get_object_or_404(Assessment, id=assessment_id, is_active=True)
-    students = User.objects.filter(enrolled_class=assessment.class_owner)
+def get_assessment_results_students(request, assessment_id):
+    assessment = get_object_or_404(
+        Assessment.objects.select_related('class_owner'),
+        id=assessment_id,
+        is_active=True
+    )
+
+    students = User.objects.filter(
+        enrolled_class=assessment.class_owner
+    ).select_related('enrolled_class')
+
+    student_ids = students.values_list('id', flat=True)
+
+    results_stats = AssessmentResult.objects.filter(
+        assessment=assessment
+    ).values('user_id').annotate(
+        score=Max('score'),  # Assuming one result per student
+        time_taken=Max('time_taken'),
+        total_answers=Count('answers'),
+        correct=Count('answers', filter=Q(answers__is_correct=True)),
+        wrong=Count('answers', filter=Q(answers__is_correct=False)),
+        blank=Count('answers', filter=Q(answers__chosen_answer=''))
+    )
+
+    # Convert to dictionary for easy lookup
+    results_dict = {stat['user_id']: stat for stat in results_stats}
+
     students_data = []
     total_score = 0
+    students_with_results = 0
+    count = 1
 
     for student in students:
-        result = AssessmentResult.objects.filter(assessment=assessment, user=student).first()
+        print(f'Processing Student {count}:', student.full_name)
+        count += 1
 
-        if result:
-            # Calculate the number of correct, wrong, skipped, and unanswered answers
-            answers = Answer.objects.filter(assessment_result=result)
-            correct_answers = answers.filter(is_correct=True).count()
-            wrong_answers = answers.filter(is_correct=False).count()
-
-            # For skipped, check if the answer doesn't exist for a question
-            skipped = 0
-            total_questions = assessment.questions.all()
-            for question in total_questions:
-                if not Answer.objects.filter(assessment_result=result, question=question).exists():
-                    skipped += 1
-
-            # For did_not_answer, check if the chosen_answer is an empty string
-            did_not_answer = answers.filter(chosen_answer="").count()
-
+        stat = results_dict.get(student.id)
+        if stat:
             students_data.append({
                 "student_id": student.id,
-                "student_name": student.full_name,
+                "name": student.full_name,
                 "taken": True,
-                "score": result.score,
-                "correct_answers": correct_answers,
-                "wrong_answers": wrong_answers,
-                "didn't_answer": did_not_answer,
-                "skipped": skipped
+                "time_spent": stat['time_taken'],
+                "correct": stat['correct'],
+                "wrong": stat['wrong'],
+                "blank": stat['blank'],
+                "skipped": assessment.questions.count() - stat['total_answers'],
             })
-            total_score += result.score
+            total_score += stat['score']
+            students_with_results += 1
         else:
             students_data.append({
                 "student_id": student.id,
-                "student_name": student.full_name,
-                "taken": False,
+                "name": student.full_name,
+                "taken": False
             })
 
-    average_score = total_score / students.count() if students.exists() else 0
+    return Response({
+        "assessment_id": assessment.id,
+        "assessment_name": assessment.name,
+        "average_score": round(total_score / students_with_results) if students_with_results else 0,
+        "students_data": students_data,  # Changed to match questions endpoint pattern
+        "total_students": len(student_ids),
+        "students_taken": students_with_results
+    }, status=status.HTTP_200_OK)
 
-    questions = assessment.questions.all()
+
+@api_view(['GET'])
+@auth_required("teacher")
+def get_assessment_results_questions(request, assessment_id):
+    assessment = get_object_or_404(
+        Assessment.objects.prefetch_related('questions'),
+        id=assessment_id,
+        is_active=True
+    )
+
+    student_ids = User.objects.filter(
+        enrolled_class=assessment.class_owner
+    ).values_list('id', flat=True)
+
     questions_data = []
-
-    for question in questions:
-        answers = Answer.objects.filter(question=question)
-        answer_counts = {
-            'a': 0,
-            'b': 0,
-            'c': 0,
-            'd': 0,
-            'did_not_answer': 0,
-            'skipped': 0,
-            'correct_answers': 0,
-            'wrong_answers': 0
-        }
-
-        for answer in answers:
-            # Count how many times each choice was selected
-            if answer.chosen_answer == 'a':
-                answer_counts['a'] += 1
-            elif answer.chosen_answer == 'b':
-                answer_counts['b'] += 1
-            elif answer.chosen_answer == 'c':
-                answer_counts['c'] += 1
-            elif answer.chosen_answer == 'd':
-                answer_counts['d'] += 1
-            elif answer.chosen_answer == '':
-                answer_counts['did_not_answer'] += 1
-
-            # Count the correct and wrong answers
-            if answer.is_correct:
-                answer_counts['correct_answers'] += 1
-            else:
-                answer_counts['wrong_answers'] += 1
+    count = 1
+    for question in assessment.questions.all():
+        print(f'Processing Question {count}:', question.id)
+        count += 1
+        stats = Answer.objects.filter(
+            question=question,
+            assessment_result__assessment=assessment,
+            assessment_result__user_id__in=student_ids
+        ).aggregate(
+            avg_time=Avg('time_spent'),
+            total=Count('pk'),
+            a=Count('pk', filter=Q(chosen_answer=question.choices['a'])),
+            b=Count('pk', filter=Q(chosen_answer=question.choices['b'])),
+            c=Count('pk', filter=Q(chosen_answer=question.choices['c'])),
+            d=Count('pk', filter=Q(chosen_answer=question.choices['d'])),
+            blank=Count('pk', filter=Q(chosen_answer='')),
+            correct=Count('pk', filter=Q(is_correct=True)),
+        )
 
         questions_data.append({
             "question_id": question.id,
-            "a": answer_counts['a'],
-            "b": answer_counts['b'],
-            "c": answer_counts['c'],
-            "d": answer_counts['d'],
-            "did_not_answer": answer_counts['did_not_answer'],
-            "skipped": answer_counts['skipped'],
-            "correct_answers": answer_counts['correct_answers'],
-            "wrong_answers": answer_counts['wrong_answers']
+            "avg_time": stats['avg_time'],
+            "a": stats['a'],
+            "b": stats['b'],
+            "c": stats['c'],
+            "d": stats['d'],
+            "blank": stats['blank'],
+            "skipped": len(student_ids) - stats['total'],
+            "correct": stats['correct'],
+            "wrong": stats['total'] - stats['correct'],
         })
 
     return Response({
         "assessment_id": assessment.id,
         "assessment_name": assessment.name,
-        "average_score": average_score,
-        "students_data": students_data,
         "questions_data": questions_data
     }, status=status.HTTP_200_OK)
 

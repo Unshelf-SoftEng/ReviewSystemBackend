@@ -117,11 +117,6 @@ class Assessment(models.Model):
         return self.name
 
 
-class AssessmentProgress(models.Model):
-    assessment = models.ForeignKey(Assessment, on_delete=models.CASCADE)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    start_time = models.DateTimeField(auto_now_add=True)
-
 
 class AssessmentResult(models.Model):
     assessment = models.ForeignKey(Assessment, on_delete=models.CASCADE)

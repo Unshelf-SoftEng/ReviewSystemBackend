@@ -5,7 +5,7 @@ import random
 from django.db.models import Prefetch
 from django.utils import timezone
 from api.models import User, Question, Assessment, Answer, AssessmentResult, UserAbility, Category, Lesson, \
-    LessonProgress, Class, AssessmentProgress, Chapter, Section
+    LessonProgress, Class, Chapter, Section
 from collections import defaultdict
 from api.ai.estimate_student_ability import estimate_ability_irt, estimate_ability_elo
 from django.shortcuts import get_object_or_404
