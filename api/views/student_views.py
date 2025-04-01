@@ -34,14 +34,11 @@ def get_class(request):
     user: User = request.user
 
     if not user.enrolled_class:
-        return Response({"message": "You are not enrolled in any class."}, status=status.HTTP_200_OK)
+        return Response({"error": "Student is not enrolled in a class."}, status=status.HTTP_200_OK)
 
     class_obj = user.enrolled_class
-
-    # Fetch only required fields to optimize query performance
     lessons = Lesson.objects.only("id", "name", "is_locked")
 
-    # Generate lesson data efficiently using list comprehension
     lesson_data = [
         {
             "id": lesson.id,
@@ -51,7 +48,6 @@ def get_class(request):
         for lesson in lessons
     ]
 
-    # Serialize class data
     class_data = {
         "id": class_obj.id,
         "student_name": user.full_name,
@@ -76,11 +72,11 @@ def join_class(request):
     code = request.data.get('class_code')
 
     if not code:
-        return Response({'error': 'Class code is required.'}, status=status.HTTP_400_BAD_REQUEST)
-    try:
-        class_obj = Class.objects.get(class_code=code)
-    except Class.DoesNotExist:
-        return Response({'error': 'Class does not exist.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'error': 'Missing class code'}, status=status.HTTP_400_BAD_REQUEST)
+
+    class_obj = Class.objects.filter(class_code=code).first()
+    if not class_obj:
+        return Response({'error': 'Invalid class code'}, status=status.HTTP_400_BAD_REQUEST)
 
     user.enrolled_class = class_obj
     user.save()
@@ -133,21 +129,21 @@ def take_initial_exam(request):
     current_time = timezone.now()
 
     exam = Assessment.objects.filter(
-        class_owner=user.enrolled_class, is_initial=True
+        class_owner=user.enrolled_class, is_initial=True, is_active=True
     ).select_related("class_owner").prefetch_related("questions").only("id", "time_limit", "deadline",
                                                                        "class_owner").first()
 
     if user.enrolled_class is None:
-        return Response({'error': "You are not enrolled in any class"}, status=status.HTTP_403_FORBIDDEN)
+        return Response({'error': "Student is not enrolled in any class"}, status=status.HTTP_403_FORBIDDEN)
 
     if not exam:
-        return Response({"error": "Can't find initial exam"}, status=status.HTTP_404_NOT_FOUND)
+        return Response({"error": "Initial Exam doesn't exist"}, status=status.HTTP_404_NOT_FOUND)
 
     if not exam.deadline:
-        return Response({'error': 'Exam is not yet open'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'error': 'Initial Exam is not open'}, status=status.HTTP_400_BAD_REQUEST)
 
     if exam.deadline < current_time:
-        return Response({'error': 'Exam deadline has already passed'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'error': 'Initial Exam deadline has already passed'}, status=status.HTTP_400_BAD_REQUEST)
 
     result, created = AssessmentResult.objects.get_or_create(
         assessment=exam, user=user,
@@ -192,12 +188,6 @@ def take_initial_exam(request):
 def take_exam(request):
     no_of_items = 60
     user: User = request.user
-
-    total_questions = Question.objects.count()
-
-    if total_questions == 0:
-        return Response({'error': 'No questions available to generate an exam.'}, status=status.HTTP_404_NOT_FOUND)
-
     selected_questions = list(Question.objects.order_by('?')[no_of_items:])
 
     exam = Assessment.objects.create(
@@ -246,15 +236,11 @@ def take_quiz(request):
     recent_quiz = Assessment.objects.filter(created_by=user, created_at__gte=thirty_minutes_ago).exists()
 
     if recent_quiz:
-        return Response({'error': 'You can only take one quiz per 30 minutes.'},
+        return Response({'error': 'Student have already taken a quiz within 30 minutes. Please try again later!'},
                         status=status.HTTP_429_TOO_MANY_REQUESTS)
 
     if question_source == 'previous_exam':
         all_questions = Question.objects.filter(category_id__in=selected_categories)
-
-        if all_questions.count() < no_of_questions:
-            return Response({'error': 'No questions available to generate an exam.'}, status=status.HTTP_404_NOT_FOUND)
-
         selected_questions = random.sample(list(all_questions), no_of_questions)
 
     elif question_source == 'ai_generated':
@@ -298,25 +284,19 @@ def take_quiz(request):
 @auth_required("student")
 def take_lesson_assessment(request, lesson_id):
     user: User = request.user
-    data = request.data
-
-    no_of_questions = int(data['no_of_questions'])
-
-    one_hour_ago = now() - timedelta(minutes=30)
-    recent_quiz = Assessment.objects.filter(created_by=user, created_at__gte=one_hour_ago).exists()
-
-    if recent_quiz:
-        return Response({'error': 'You can only take one quiz per 30 minutes.'},
-                        status=status.HTTP_429_TOO_MANY_REQUESTS)
-
     lesson = get_object_or_404(Lesson, id=lesson_id)
     lesson_category = get_object_or_404(Category, name=lesson.name)
 
+    thirty_minutes_ago = now() - timedelta(minutes=30)
+    recent_quiz = Assessment.objects.filter(lesson=lesson, class_owner=user.enrolled_class, created_at__gte=thirty_minutes_ago).exists()
+
+    if recent_quiz:
+        return Response({'error': 'Student have already taken a quiz within 30 minutes. Please try again later!'},
+                        status=status.HTTP_429_TOO_MANY_REQUESTS)
+
+    no_of_questions = 20
     all_questions = list(Question.objects.filter(category_id=lesson_category.id))
     selected_questions = random.sample(list(all_questions), no_of_questions)
-
-    # TODO: Delete Afterwards
-    selected_questions = Question.objects.filter(id='24-A-43')
 
     lesson_assessment = Assessment.objects.create(
         name=f'Lesson Quiz: {lesson.name}',
@@ -350,14 +330,16 @@ def take_lesson_assessment(request, lesson_id):
 @auth_required("student")
 def take_chapter_assessment(request, chapter_id):
     user: User = request.user
+    chapter = get_object_or_404(Chapter, id=chapter_id)
+    thirty_minutes_ago = now() - timedelta(minutes=30)
+    recent_quiz = Assessment.objects.filter(chapter=chapter, class_owner=user.enrolled_class,
+                                            created_at__gte=thirty_minutes_ago).exists()
+
+    if recent_quiz:
+        return Response({'error': 'Student have already taken a quiz within 30 minutes. Please try again later!'},
+                        status=status.HTTP_429_TOO_MANY_REQUESTS)
 
     no_of_questions = 20
-
-    chapter = Chapter.objects.get(id=chapter_id)
-
-    if chapter is None:
-        return Response({'error': 'Chapter does not exist.'}, status=status.HTTP_404_NOT_FOUND)
-
     all_questions = list(Question.objects.filter(category__subcategory__name=chapter.name))
     selected_questions = random.sample(list(all_questions), no_of_questions)
 
@@ -394,10 +376,10 @@ def take_chapter_assessment(request, chapter_id):
 def take_teacher_assessment(request, assessment_id):
     user: User = request.user
 
-    assessment = Assessment.objects.filter(assessment__id=assessment_id)
+    assessment = get_object_or_404(Assessment.objects.prefetch_related("questions"), assessment__id=assessment_id, is_active=True)
 
     if user.enrolled_class != assessment.class_owner:
-        return Response({'error': "User doesn't belong to the class"}, status=status.HTTP_403_FORBIDDEN)
+        return Response({'error': "Student doesn't belong to the class."}, status=status.HTTP_403_FORBIDDEN)
 
     quiz_data = {
         'quiz_id': assessment.id,
@@ -422,10 +404,7 @@ def take_teacher_assessment(request, assessment_id):
 def check_time_limit(request, assessment_id):
     user: User = request.user
 
-    assessment: Assessment = Assessment.objects.filter(id=assessment_id).first()
-
-    if assessment is None:
-        return Response({'error': 'Assessment does not exist'}, status=status.HTTP_404_NOT_FOUND)
+    assessment = get_object_or_404(Assessment, id=assessment_id, is_active=True)
 
     if assessment.time_limit is None:
         return Response({'error': 'No time limit.'}, status=status.HTTP_404_NOT_FOUND)
@@ -443,7 +422,7 @@ def check_time_limit(request, assessment_id):
     if deadline:
         remaining_time_until_deadline = (deadline - current_time).total_seconds()
     else:
-        remaining_time_until_deadline = float('inf')  # No deadline, so no restriction
+        remaining_time_until_deadline = float('inf')
 
     remaining_time_based_on_limit = time_limit - elapsed_time
 
@@ -460,10 +439,8 @@ def check_time_limit(request, assessment_id):
 def submit_assessment(request, assessment_id):
     user: User = request.user
     current_time = timezone.now()
-    assessment = Assessment.objects.filter(id=assessment_id).first()
 
-    if assessment is None:
-        return Response({'error': 'Assessment does not exist'}, status=status.HTTP_404_NOT_FOUND)
+    assessment = get_object_or_404(Assessment, id=assessment_id, is_active=True)
 
     if assessment.source == 'student_initiated' and assessment.created_by != user:
         return Response({'error': 'You are not allowed to submit answers on this assessment'},
@@ -540,8 +517,6 @@ def submit_assessment(request, assessment_id):
 @auth_required("student")
 def get_assessment_result(request, assessment_id):
     user: User = request.user
-
-    # Optimized query with select_related and prefetch_related
     result = AssessmentResult.objects.select_related('assessment', 'user').prefetch_related(
         Prefetch('answers', queryset=Answer.objects.select_related('question__category')),
         Prefetch('assessment__questions', queryset=Question.objects.select_related('category'))
@@ -628,7 +603,6 @@ def get_ability(request):
     estimate_ability_irt(user.id)
     estimate_ability_elo(user.id)
 
-    # Retrieve stored abilities
     user_abilities = UserAbility.objects.filter(user_id=user.id)
     irt_abilities = {
         user_ability.category.name: user_ability.irt_ability for user_ability in user_abilities
@@ -649,21 +623,22 @@ def get_ability(request):
 def get_class_assessments(request):
     user: User = request.user
 
-    assessments = Assessment.objects.filter(source='teacher_generated', class_owner=user.enrolled_class).order_by(
+    assessments = Assessment.objects.filter(source='teacher_generated', class_owner=user.enrolled_class, is_active=True).order_by(
         '-created_at')
     assessments_data = []
 
     for assessment in assessments:
-        was_taken = AssessmentResult.objects.filter(assessment=assessment, user=user).exists()
+        result = AssessmentResult.objects.filter(assessment=assessment, user=user).first()
         is_open = assessment.deadline is None or assessment.deadline >= timezone.now()
-        in_progress = AssessmentProgress.objects.filter(assessment=assessment, user=user).exists()
 
-        if was_taken:
+        if not result:
+            assessment_status = 'Open'
+        elif result.is_submitted:
             assessment_status = 'Completed'
-        elif in_progress:
-            assessment_status = 'In Progress'
         else:
-            assessment_status = 'Not Started'
+            expected_end_time = result.start_time + result.assessment.time_limit
+            end_time = min(expected_end_time, result.assessment.deadline)
+            assessment_status = 'In Progress' if end_time >= timezone.now() else 'Completed'
 
         data = {
             'id': assessment.id,

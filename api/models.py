@@ -84,9 +84,10 @@ class Assessment(models.Model):
     ]
 
     SOURCE_CHOICES = [
-        ('teacher_generated', 'Teacher Generated'),
         ('student_initiated', 'Student Initiated'),
+        ('teacher_generated', 'Teacher Generated'),
         ('lesson_generated', 'Lesson Generated'),
+        ('exam_generated', 'Exam Generated'),
         ('admin_generated', 'Admin Generated'),
     ]
 
@@ -98,22 +99,19 @@ class Assessment(models.Model):
 
     name = models.CharField(max_length=50, null=True)
     type = models.CharField(max_length=50, choices=TYPE_CHOICES)
-
     class_owner = models.ForeignKey('Class', on_delete=models.CASCADE, null=True, blank=True)
     lesson = models.ForeignKey('Lesson', on_delete=models.CASCADE, null=True, blank=True)
     chapter = models.ForeignKey('Chapter', on_delete=models.CASCADE, null=True, blank=True)
     created_by = models.ForeignKey('User', on_delete=models.SET_NULL, null=True, blank=True)
-
     questions = models.ManyToManyField("Question", related_name="assessments")
     selected_categories = models.ManyToManyField(Category, blank=True)
-
     created_at = models.DateTimeField(auto_now_add=True)
     time_limit = models.IntegerField(default=0)
     deadline = models.DateTimeField(null=True, blank=True)
     is_initial = models.BooleanField(default=False)
-
     source = models.CharField(max_length=50, choices=SOURCE_CHOICES, default='admin_generated')
     question_source = models.CharField(max_length=50, choices=QUESTION_SOURCE_CHOICES, default='previous_exam')
+    is_active = models.BooleanField(default=True)
 
     def __str__(self):
         return self.name

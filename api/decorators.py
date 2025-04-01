@@ -54,7 +54,7 @@ def auth_required(*allowed_roles):
                         new_refresh_token = new_session.session.refresh_token
 
                         user_data = supabase_client.auth.get_user(jwt=new_access_token)
-                        user = User.objects.get(supabase_user_id=user_data.user.id)
+                        user = get_object_or_404(User, supabase_user_id=user_data.user.id)
 
                         if allowed_roles and user.role not in allowed_roles:
                             return Response({"error": "Unauthorized"},
