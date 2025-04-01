@@ -1,5 +1,4 @@
 .env
-question_ids.txt
 api/utils/credentials.json
 TODO.md
 *.pyc
