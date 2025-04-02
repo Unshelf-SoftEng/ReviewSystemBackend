@@ -308,10 +308,10 @@ def save_progress(request, assessment_id):
 
     current_time = timezone.now()
 
-    try:
-        result = AssessmentResult.objects.get(user=user, assessment__id=assessment_id)
-    except AssessmentResult.DoesNotExist:
-        return Response({'error': 'Assessment result not found.'}, status=status.HTTP_404_NOT_FOUND)
+    result = get_object_or_404(AssessmentResult, user=user, assessment__id=assessment_id)
+
+    if result.is_submitted:
+        return Response({'error': 'Result was already submitted'}, status=status.HTTP_400_BAD_REQUEST)
 
     # Fetch all the questions upfront to avoid N+1 queries
     question_ids = [answer_data.get('question_id') for answer_data in answers]
@@ -365,24 +365,29 @@ def save_progress(request, assessment_id):
     if answers_to_create:
         Answer.objects.bulk_create(answers_to_create)
 
-    # Calculate remaining time
-    elapsed_time = int((current_time - result.start_time).total_seconds())
-    time_limit = result.assessment.time_limit
-    deadline = result.assessment.deadline
+    response_data = {
+        'message': 'Progress was stored successfully',
+    }
 
-    remaining_time_until_deadline = int((deadline - current_time).total_seconds()) if deadline else float('inf')
-    remaining_time_based_on_limit = int(time_limit - elapsed_time)
-    remaining_time = int(min(remaining_time_based_on_limit, remaining_time_until_deadline))
+    if result.assessment.time_limit or result.assessment.deadline:
+        elapsed_time = int((current_time - result.start_time).total_seconds())
+        time_limit = result.assessment.time_limit
+        deadline = result.assessment.deadline
 
-    if remaining_time <= 0:
-        return Response({'error': 'Time limit exceeded.'}, status=status.HTTP_404_NOT_FOUND)
+        remaining_time_until_deadline = int((deadline - current_time).total_seconds()) if deadline else float('inf')
+        remaining_time_based_on_limit = int(time_limit - elapsed_time)
+        remaining_time = int(min(remaining_time_based_on_limit, remaining_time_until_deadline))
+
+        if remaining_time <= 0:
+            return Response({'error': 'Time limit exceeded.'}, status=status.HTTP_404_NOT_FOUND)
+
+        response_data['time_left'] = remaining_time
 
     result.last_activity = current_time
     result.score = score
     result.save()
 
-    return Response({'message': 'Progress was stored successfully', 'time_left': remaining_time},
-                    status=status.HTTP_201_CREATED)
+    return Response(response_data, status=status.HTTP_201_CREATED)
 
 
 @api_view(['GET'])
@@ -434,12 +439,12 @@ def take_quiz(request):
     no_of_questions = int(request.data.get('no_of_questions', 5))
     question_source = request.data.get('question_source')
 
-    thirty_minutes_ago = now() - timedelta(minutes=30)
-    recent_quiz = Assessment.objects.filter(created_by=user, created_at__gte=thirty_minutes_ago).exists()
-
-    if recent_quiz:
-        return Response({'error': 'Student have already taken a quiz within 30 minutes. Please try again later!'},
-                        status=status.HTTP_429_TOO_MANY_REQUESTS)
+    # thirty_minutes_ago = now() - timedelta(minutes=30)
+    # recent_quiz = Assessment.objects.filter(created_by=user, created_at__gte=thirty_minutes_ago).exists()
+    #
+    # if recent_quiz:
+    #     return Response({'error': 'Student have already taken a quiz within 30 minutes. Please try again later!'},
+    #                     status=status.HTTP_429_TOO_MANY_REQUESTS)
 
     if question_source == 'previous_exam':
         all_questions = Question.objects.filter(category_id__in=selected_categories)
@@ -466,10 +471,7 @@ def take_quiz(request):
     quiz.selected_categories.set(categories)
     quiz.save()
 
-    AssessmentResult.objects.create(
-        assessment=quiz, user=user,
-        defaults={"start_time": now()}
-    )
+    AssessmentResult.objects.create(assessment=quiz, user=user, start_time=now())
 
     quiz_data = {
         'quiz_id': quiz.id,
@@ -531,6 +533,8 @@ def take_lesson_assessment(request, lesson_id):
         ]
     }
 
+    AssessmentResult.objects.create(assessment=lesson_assessment, user=user, start_time=now())
+
     return Response(quiz_data, status=status.HTTP_201_CREATED)
 
 
@@ -575,6 +579,8 @@ def take_chapter_assessment(request, chapter_id):
             for question in selected_questions
         ]
     }
+
+    AssessmentResult.objects.create(assessment=chapter_assessment, user=user, start_time=now())
 
     return Response(quiz_data, status=status.HTTP_201_CREATED)
 
@@ -624,14 +630,10 @@ def submit_assessment(request, assessment_id):
             return Response({'error': 'You are not allowed to submit answers on this assessment'},
                             status=status.HTTP_403_FORBIDDEN)
 
-    result, created = AssessmentResult.objects.get_or_create(
-        user=user,
-        assessment_id=assessment_id,
-        defaults={'is_submitted': False}
-    )
+    result = get_object_or_404(AssessmentResult, user=user, assessment_id=assessment_id)
 
     if result.is_submitted:
-        return Response({'error': 'Exam was already submitted.'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'error': 'Assessment was already submitted.'}, status=status.HTTP_400_BAD_REQUEST)
 
     is_auto_submission = False
 
