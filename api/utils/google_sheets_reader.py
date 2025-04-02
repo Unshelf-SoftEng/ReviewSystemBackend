@@ -139,7 +139,7 @@ def upload_pretest_from_sheet(spreadsheet_id, range_name):
                     question_text=question_text,
                     image_url=image_url,
                     category=category,
-                    difficulty=difficulty,
+                    ai_difficulty=difficulty,
                     discrimination=discrimination,
                     guessing=guessing,
                     choices=choices,

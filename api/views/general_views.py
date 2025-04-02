@@ -122,7 +122,7 @@ def register_user(request):
             )
             categories = Category.objects.all()
             user_abilities = [
-                UserAbility(user=new_user, category=category, elo_ability=1000, irt_ability=0)
+                UserAbility(user=new_user, category=category, elo_ability=1500, irt_ability=0)
                 for category in categories
             ]
             UserAbility.objects.bulk_create(user_abilities)
