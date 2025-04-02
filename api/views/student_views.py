@@ -90,7 +90,6 @@ def get_dashboard_data(request):
     user: User = request.user
     lessons = Lesson.objects.only("id", "name", "is_locked")
 
-    # Generate lesson data efficiently using list comprehension
     lesson_data = [
         {
             "id": lesson.id,
@@ -100,7 +99,7 @@ def get_dashboard_data(request):
         for lesson in lessons
     ]
 
-    assessment_results = AssessmentResult.objects.filter(user__id=user.id).order_by('-start_time')
+    assessment_results = AssessmentResult.objects.filter(user=user).order_by('-start_time')
 
     history_data = []
     for result in assessment_results:
@@ -113,22 +112,19 @@ def get_dashboard_data(request):
                 question__category=category
             )
 
-            correct_answers = answers.filter(is_correct=True).count()
-            wrong_answers = answers.filter(is_correct=False).count()
-
             categories.append({
                 'category_name': category.name,
-                'correct_answer': correct_answers,
-                'wrong_answer': wrong_answers
+                'correct_answer': answers.filter(is_correct=True).count(),
+                'wrong_answer': answers.filter(is_correct=False).count()
             })
 
         item = {
             'assessment_id': result.assessment.id,
             'type': result.assessment.type,
-            'score': result.score,
-            'total_items': result.assessment.questions.count(),
-            'time_taken': result.time_taken,
-            'date_taken': result.assessment.created_at,
+            'score': result.score or 0,
+            'total_items': result.assessment.questions.count() or 0,
+            'time_taken': result.time_taken or 0,
+            'date_taken': result.assessment.created_at.isoformat() if result.assessment.created_at else None,
             'question_source': result.assessment.question_source,
             'source': result.assessment.source,
             'categories': categories,
@@ -143,6 +139,7 @@ def get_dashboard_data(request):
     }
 
     return Response(response_data, status=status.HTTP_200_OK)
+
 
 
 @api_view(['GET'])
@@ -328,6 +325,8 @@ def save_progress(request, assessment_id):
     existing_answers = Answer.objects.filter(assessment_result=result, question__id__in=question_ids)
     existing_answers_dict = {(answer.question.id): answer for answer in existing_answers}
 
+    score = 0
+
     for answer_data in answers:
         question_id = answer_data.get('question_id')
         chosen_answer = answer_data.get('answer')
@@ -338,6 +337,7 @@ def save_progress(request, assessment_id):
             existing_answer = existing_answers_dict.get(question_id)
             correct_answer = question.choices[question.correct_answer]
             is_correct = chosen_answer == correct_answer
+            score += is_correct
 
             if existing_answer:
                 existing_answer.chosen_answer = chosen_answer
@@ -378,6 +378,7 @@ def save_progress(request, assessment_id):
         return Response({'error': 'Time limit exceeded.'}, status=status.HTTP_404_NOT_FOUND)
 
     result.last_activity = current_time
+    result.score = score
     result.save()
 
     return Response({'message': 'Progress was stored successfully', 'time_left': remaining_time},
@@ -698,7 +699,7 @@ def submit_assessment(request, assessment_id):
     if answers_to_create:
         Answer.objects.bulk_create(answers_to_create)
 
-    result.time_taken = (current_time - result.start_time).second()
+    result.time_taken = (current_time - result.start_time).seconds
     result.score = score
     result.is_submitted = True
     result.save()

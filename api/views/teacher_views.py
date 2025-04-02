@@ -385,15 +385,37 @@ def get_assessment_results_questions(request, assessment_id):
         is_active=True
     )
 
+    # Get all students who took the assessment
     student_ids = User.objects.filter(
         enrolled_class=assessment.class_owner
     ).values_list('id', flat=True)
+
+    # First get total scores for all students to determine high/low performers
+    student_scores = {}
+    for student_id in student_ids:
+        total_score = Answer.objects.filter(
+            assessment_result__assessment=assessment,
+            assessment_result__user_id=student_id,
+            is_correct=True
+        ).count()
+        student_scores[student_id] = total_score
+
+    # Sort students by score and determine cutoff points
+    sorted_scores = sorted(student_scores.items(), key=lambda x: x[1], reverse=True)
+    num_students = len(sorted_scores)
+    upper_cutoff = int(num_students * 0.27)
+    lower_cutoff = num_students - upper_cutoff
+
+    upper_group = [x[0] for x in sorted_scores[:upper_cutoff]]
+    lower_group = [x[0] for x in sorted_scores[lower_cutoff:]]
 
     questions_data = []
     count = 1
     for question in assessment.questions.all():
         print(f'Processing Question {count}:', question.id)
         count += 1
+
+        # Get stats for all students
         stats = Answer.objects.filter(
             question=question,
             assessment_result__assessment=assessment,
@@ -409,22 +431,48 @@ def get_assessment_results_questions(request, assessment_id):
             correct=Count('pk', filter=Q(is_correct=True)),
         )
 
+        # Get stats for upper and lower groups
+        upper_correct = Answer.objects.filter(
+            question=question,
+            assessment_result__assessment=assessment,
+            assessment_result__user_id__in=upper_group,
+            is_correct=True
+        ).count()
+
+        lower_correct = Answer.objects.filter(
+            question=question,
+            assessment_result__assessment=assessment,
+            assessment_result__user_id__in=lower_group,
+            is_correct=True
+        ).count()
+
+        upper_proportion = upper_correct / len(upper_group) if upper_group else 0
+        lower_proportion = lower_correct / len(lower_group) if lower_group else 0
+        upper_percent = upper_proportion * 100 if upper_proportion else 0
+        lower_percent = lower_proportion * 100 if lower_proportion else 0
+        discrimination = upper_proportion - lower_proportion
+
         questions_data.append({
             "question_id": question.id,
-            "avg_time": stats['avg_time'],
-            "a": stats['a'],
-            "b": stats['b'],
-            "c": stats['c'],
-            "d": stats['d'],
-            "blank": stats['blank'],
-            "skipped": len(student_ids) - stats['total'],
-            "correct": stats['correct'],
-            "wrong": stats['total'] - stats['correct'],
+            "avg_time_seconds": stats['avg_time'],
+            "answer_choices": {
+                "a": stats['a'],
+                "b": stats['b'],
+                "c": stats['c'],
+                "d": stats['d'],
+                "blank": stats['blank'],
+                "skipped": len(student_ids) - stats['total'],
+            },
+            "correct_answers": stats['correct'],
+            "wrong_answers": stats['total'] - stats['correct'],
+            "percent_correct": stats['correct'] / stats['total'] * 100 if stats['total'] else 0,
+            "discrimination": discrimination,
         })
 
     return Response({
         "assessment_id": assessment.id,
         "assessment_name": assessment.name,
+        "total_students": len(student_ids),
         "questions_data": questions_data
     }, status=status.HTTP_200_OK)
 
