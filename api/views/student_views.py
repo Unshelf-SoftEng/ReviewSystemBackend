@@ -107,19 +107,19 @@ def get_dashboard_data(request):
         categories = []
 
         for category in selected_categories:
-            answers = Answer.objects.filter(
-                assessment_result=result,
-                question__category=category
-            )
+            total_questions = result.assessment.questions.filter(category=category).count()
+            answered_questions = Answer.objects.filter(assessment_result=result, question__category=category)
+            correct_count = answered_questions.filter(is_correct=True).count()
 
             categories.append({
                 'category_name': category.name,
-                'correct_answer': answers.filter(is_correct=True).count(),
-                'wrong_answer': answers.filter(is_correct=False).count()
+                'total_questions': total_questions,
+                'correct_answer': correct_count,
             })
 
         item = {
             'assessment_id': result.assessment.id,
+            'name': result.assessment.name,
             'type': result.assessment.type,
             'score': result.score or 0,
             'total_items': result.assessment.questions.count() or 0,
@@ -219,7 +219,7 @@ def take_initial_exam(request):
         return Response({'error': 'Student has already taken the exam.'}, status=status.HTTP_400_BAD_REQUEST)
 
     questions = list(exam.questions.values("id", "image_url", "question_text", "choices"))
-    # random.shuffle(questions)
+    random.shuffle(questions)
 
     answers = Answer.objects.filter(assessment_result=result)
 
@@ -465,6 +465,11 @@ def take_quiz(request):
     quiz.questions.set(selected_questions)
     quiz.selected_categories.set(categories)
     quiz.save()
+
+    AssessmentResult.objects.create(
+        assessment=quiz, user=user,
+        defaults={"start_time": now()}
+    )
 
     quiz_data = {
         'quiz_id': quiz.id,
@@ -720,19 +725,13 @@ def get_assessment_result(request, assessment_id):
     if result is None:
         return Response({'error': 'No Result for Assessment Found'}, status=status.HTTP_404_NOT_FOUND)
 
-    if result.assessment.time_limit or result.assessment.deadline:
+    if not result.is_submitted and (result.assessment.time_limit or result.assessment.deadline):
         time_limit = result.start_time + timedelta(
             seconds=result.assessment.time_limit) if result.assessment.time_limit else None
 
-        print('Time limit', time_limit)
-        print('Deadline', result.assessment.deadline)
-
         expected_end = min(time_limit, result.assessment.deadline)
 
-        print('Expected end time', expected_end)
-        print('Time now', timezone.now())
-
-        if not result.is_submitted and expected_end > timezone.now():
+        if expected_end > timezone.now():
             return Response({'error': 'Assessment is still in progress.'}, status=status.HTTP_400_BAD_REQUEST)
 
     answers = result.answers.all()
@@ -804,9 +803,9 @@ def get_assessment_result(request, assessment_id):
         'total_time_taken_seconds': time_taken,
         'score': result.score,
         'categories': categories,
+        'total_questions': questions.count(),
         'overall_correct_answers': overall_correct_answers,
         'overall_wrong_answers': overall_wrong_answers,
-        'total_questions': questions.count(),
         'answers': serialized_answers,
     }
 
