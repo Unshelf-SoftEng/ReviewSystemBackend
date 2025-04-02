@@ -619,10 +619,11 @@ def submit_assessment(request, assessment_id):
             return Response({'error': 'You are not allowed to submit answers on this assessment'},
                             status=status.HTTP_403_FORBIDDEN)
 
-    result = AssessmentResult.objects.filter(user=user, assessment_id=assessment_id).first()
-
-    if not result:
-        return Response({'error': 'Assessment result not found.'}, status=status.HTTP_404_NOT_FOUND)
+    result, created = AssessmentResult.objects.get_or_create(
+        user=user,
+        assessment_id=assessment_id,
+        defaults={'is_submitted': False}
+    )
 
     if result.is_submitted:
         return Response({'error': 'Exam was already submitted.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -719,19 +720,20 @@ def get_assessment_result(request, assessment_id):
     if result is None:
         return Response({'error': 'No Result for Assessment Found'}, status=status.HTTP_404_NOT_FOUND)
 
-    time_limit = result.start_time + timedelta(
-        seconds=result.assessment.time_limit) if result.assessment.time_limit else None
+    if result.assessment.time_limit or result.assessment.deadline:
+        time_limit = result.start_time + timedelta(
+            seconds=result.assessment.time_limit) if result.assessment.time_limit else None
 
-    print('Time limit', time_limit)
-    print('Deadline', result.assessment.deadline)
+        print('Time limit', time_limit)
+        print('Deadline', result.assessment.deadline)
 
-    expected_end = min(time_limit, result.assessment.deadline)
+        expected_end = min(time_limit, result.assessment.deadline)
 
-    print('Expected end time', expected_end)
-    print('Time now', timezone.now())
+        print('Expected end time', expected_end)
+        print('Time now', timezone.now())
 
-    if not result.is_submitted and expected_end > timezone.now():
-        return Response({'error': 'Assessment is still in progress.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not result.is_submitted and expected_end > timezone.now():
+            return Response({'error': 'Assessment is still in progress.'}, status=status.HTTP_400_BAD_REQUEST)
 
     answers = result.answers.all()
     answer_dict = {ans.question.id: ans for ans in answers}
