@@ -802,12 +802,12 @@ def get_assessment_result(request, assessment_id):
     result_data = {
         'exam_id': result.assessment.id,
         'student_id': result.user.id,
-        'total_time_taken_seconds': time_taken,
         'score': result.score,
-        'categories': categories,
+        'total_time_taken_seconds': time_taken,
         'total_questions': questions.count(),
         'overall_correct_answers': overall_correct_answers,
         'overall_wrong_answers': overall_wrong_answers,
+        'categories': categories,
         'answers': serialized_answers,
     }
 

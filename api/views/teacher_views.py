@@ -8,6 +8,7 @@ from api.models import User, Class, UserAbility, Assessment, AssessmentResult, Q
 from api.decorators import auth_required
 import os
 from collections import defaultdict
+from api.ai.estimate_student_ability import estimate_ability_irt, estimate_ability_elo
 
 
 @api_view(['GET'])
@@ -400,11 +401,10 @@ def get_assessment_results_questions(request, assessment_id):
         ).count()
         student_scores[student_id] = total_score
 
-    # Sort students by score and determine cutoff points
     sorted_scores = sorted(student_scores.items(), key=lambda x: x[1], reverse=True)
     num_students = len(sorted_scores)
-    upper_cutoff = int(num_students * 0.27)
-    lower_cutoff = num_students - upper_cutoff
+    upper_cutoff = int(num_students * 0.25)
+    lower_cutoff = int(num_students * 0.75)
 
     upper_group = [x[0] for x in sorted_scores[:upper_cutoff]]
     lower_group = [x[0] for x in sorted_scores[lower_cutoff:]]
@@ -412,7 +412,6 @@ def get_assessment_results_questions(request, assessment_id):
     questions_data = []
     count = 1
     for question in assessment.questions.all():
-        print(f'Processing Question {count}:', question.id)
         count += 1
 
         # Get stats for all students
@@ -448,12 +447,17 @@ def get_assessment_results_questions(request, assessment_id):
 
         upper_proportion = upper_correct / len(upper_group) if upper_group else 0
         lower_proportion = lower_correct / len(lower_group) if lower_group else 0
-        upper_percent = upper_proportion * 100 if upper_proportion else 0
-        lower_percent = lower_proportion * 100 if lower_proportion else 0
+        # upper_percent = upper_proportion * 100 if upper_proportion else 0
+        # lower_percent = lower_proportion * 100 if lower_proportion else 0
         discrimination = upper_proportion - lower_proportion
+        question.discrimination = discrimination
+        question.save()
 
         questions_data.append({
             "question_id": question.id,
+            "question_txt": question.question_text,
+            'choices': question.choices,
+            "answer": question.correct_answer,
             "avg_time_seconds": stats['avg_time'],
             "answer_choices": {
                 "a": stats['a'],
@@ -697,3 +701,38 @@ def get_chapter_quiz(request, class_id, chapter_id):
         "average_percentage": round(average_score, 2),
         "students_data": students_data,
     }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@auth_required("teacher")
+def estimate_ability_students(request, class_id):
+    students = User.objects.filter(enrolled_class__id=class_id)
+    count = 1
+    response_data = []
+    for student in students:
+        print("Estimating Ability of ", student.full_name)
+        print("Count: ", count)
+        count += 1
+
+        assessment = Assessment.objects.filter(class_owner_id=class_id, is_initial=True).first()
+        if AssessmentResult.objects.filter(assessment=assessment, user=student).exists():
+            estimate_ability_irt(student.id)
+            # estimate_ability_elo(student.id)
+
+            user_abilities = UserAbility.objects.filter(user_id=student.id)
+            irt_abilities = {
+                user_ability.category.name: user_ability.irt_ability for user_ability in user_abilities
+            }
+
+            elo_abilities = {
+                user_ability.category.name: user_ability.elo_ability for user_ability in user_abilities
+            }
+
+            response_data.append({
+                "id": student.id,
+                "name": student.full_name,
+                "irt": irt_abilities,
+                "elo": elo_abilities,
+            })
+
+    return Response(response_data, status=status.HTTP_200_OK)
