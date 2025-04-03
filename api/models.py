@@ -48,8 +48,9 @@ class Subcategory(models.Model):
 class UserAbility(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     category = models.ForeignKey(Category, on_delete=models.CASCADE)
-    irt_ability = models.FloatField()
-    elo_ability = models.IntegerField()
+    irt_ability = models.FloatField(default=0)
+    elo_ability = models.IntegerField(default=1500)
+    elo_time_ability = models.IntegerField(default=1500)
 
     class Meta:
         unique_together = (('user', 'category'),)

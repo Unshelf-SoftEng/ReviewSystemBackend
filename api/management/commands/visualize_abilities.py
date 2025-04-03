@@ -63,6 +63,7 @@ class Command(BaseCommand):
                 category_data.append({
                     'category': category.name,
                     'elo': ability.elo_ability,
+                    'elo_time': ability.elo_time_ability,
                     'irt': ability.irt_ability,
                     'score': normalized_score,
                     'correct': correct_answers,
@@ -75,53 +76,75 @@ class Command(BaseCommand):
 
             df = pd.DataFrame(category_data)
 
-            # Create visualization
-            fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(24, 6))
-            fig.suptitle( f'Ability vs Performance for User ID: {user.id})\nScore: {result.score}')
+            fig, axes = plt.subplots(2, 2, figsize=(12, 12))
+            axes = axes.flatten()
 
             # Score Breakdown
-            ax1.bar(df['category'], df['correct'], color='purple', label='Correct Answers')
-            ax1.bar(df['category'], df['total'] - df['correct'], bottom=df['correct'],
-                    color='gray', label='Incorrect Answers')
-            ax1.set_title('Score Breakdown by Category')
-            ax1.set_ylabel('Number of Questions')
-            ax1.set_xticklabels(df['category'], rotation=45)
-            ax1.legend()
+            if 'category' in df.columns:
+                ax = axes[0]
+                ax.bar(df['category'], df['correct'], color='purple', label='Correct')
+                ax.bar(df['category'], df['total'] - df['correct'], bottom=df['correct'],
+                       color='gray', label='Incorrect')
+                ax.set_title('Score Breakdown')
+                ax.set_ylabel('Questions')
+                ax.set_xticklabels(df['category'], rotation=45)
+                ax.legend()
 
-            # IRT vs Performance
-            ax2.scatter(df['irt'], df['score'], color='red', s=100)
-            ax2.set_title('IRT Ability vs Actual Performance')
-            ax2.set_xlabel('IRT Ability')
-            ax2.set_ylabel('Normalized Score (0-1)')
-            ax2.set_xlim(-4, 4)
-            ax2.set_xticks(np.arange(-3, 3, 1))
-            ax2.set_ylim(-0.1, 1.1)
-            ax2.set_yticks(np.arange(0, 1.1, 0.1))
+            if 'irt' in df.columns and len(df) > 1:
+                ax = axes[1]
+                ax.scatter(df['irt'], df['score'], color='red', s=100)
+                ax.set_title('IRT vs Performance')
+                ax.set_xlabel('IRT Ability')
+                ax.set_ylabel('Normalized Score (0-1)')
+                ax.set_xlim(-4, 4)
+                ax.set_xticks(np.arange(-3, 3, 1))
+                ax.set_ylim(-0.1, 1.1)
+                ax.set_yticks(np.arange(0, 1.1, 0.1))
 
-            if len(df) > 1:
-                z = np.polyfit(df['irt'], df['score'], 1)
-                p = np.poly1d(z)
-                ax2.plot(df['irt'], p(df['irt']), "b--")
-                ax2.text(0.05, 0.95, f'Correlation: {np.corrcoef(df["irt"], df["score"])[0, 1]:.2f}',
-                         transform=ax2.transAxes, ha='left', va='top',
-                         bbox=dict(facecolor='white', alpha=0.8))
+                if len(df) > 1:
+                    z = np.polyfit(df['irt'], df['score'], 1)
+                    p = np.poly1d(z)
+                    ax.plot(df['irt'], p(df['irt']), "b--")
+                    ax.text(0.05, 0.95, f'Correlation: {np.corrcoef(df["irt"], df["score"])[0, 1]:.2f}',
+                             transform=ax.transAxes, ha='left', va='top',
+                             bbox=dict(facecolor='white', alpha=0.8))
 
-            # ELO vs Performance (Scatter Plot)
-            ax3.scatter(df['elo'], df['score'], color='green', s=100)
-            ax3.set_title('ELO Ability vs Actual Performance')
-            ax3.set_xlabel('ELO Ability')
-            ax3.set_ylabel('Normalized Score (0-1)')
-            ax3.set_ylim(-0.1, 1.1)
-            ax3.set_yticks(np.arange(0, 1.1, 0.1))
+            if 'elo' in df.columns and len(df) > 1:
+                ax = axes[2]
+                ax.scatter(df['elo'], df['score'], color='green', s=100)
+                ax.set_title('ELO vs Performance')
 
-            if len(df) > 1:
-                z_elo = np.polyfit(df['elo'], df['score'], 1)
-                p_elo = np.poly1d(z_elo)
-                ax3.plot(df['elo'], p_elo(df['elo']), "b--")
-                ax3.text(0.05, 0.95, f'Correlation: {np.corrcoef(df["elo"], df["score"])[0, 1]:.2f}',
-                         transform=ax3.transAxes, ha='left', va='top',
-                         bbox=dict(facecolor='white', alpha=0.8))
+                ax.set_xlabel('ELO Ability')
+                ax.set_ylabel('Normalized Score (0-1)')
+                ax.set_ylim(-0.1, 1.1)
+                ax.set_yticks(np.arange(0, 1.1, 0.1))
 
+                if len(df) > 1:
+                    z_elo = np.polyfit(df['elo'], df['score'], 1)
+                    p_elo = np.poly1d(z_elo)
+                    ax.plot(df['elo'], p_elo(df['elo']), "b--")
+                    ax.text(0.05, 0.95, f'Correlation: {np.corrcoef(df["elo"], df["score"])[0, 1]:.2f}',
+                             transform=ax.transAxes, ha='left', va='top',
+                             bbox=dict(facecolor='white', alpha=0.8))
+
+            if 'elo_time' in df.columns and len(df) > 1:
+                ax = axes[3]
+                ax.scatter(df['elo_time'], df['score'], color='blue', s=100)
+                ax.set_title('ELO-Time vs Performance')
+                ax.set_xlabel('ELO Ability')
+                ax.set_ylabel('Normalized Score (0-1)')
+                ax.set_ylim(-0.1, 1.1)
+                ax.set_yticks(np.arange(0, 1.1, 0.1))
+
+                if len(df) > 1:
+                    z_elo = np.polyfit(df['elo_time'], df['score'], 1)
+                    p_elo = np.poly1d(z_elo)
+                    ax.plot(df['elo_time'], p_elo(df['elo_time']), "b--")
+                    ax.text(0.05, 0.95, f'Correlation: {np.corrcoef(df["elo_time"], df["score"])[0, 1]:.2f}',
+                             transform=ax.transAxes, ha='left', va='top',
+                             bbox=dict(facecolor='white', alpha=0.8))
+
+            plt.suptitle(f"Student Ability of Student ID: {user.id}.\nScore: {result.score}", fontsize=16, fontweight='bold')
             plt.tight_layout()
 
             if output_format == 'console':

@@ -7,8 +7,7 @@ from django.db.models import Count, Q, Avg, Max, Prefetch
 from api.models import User, Class, UserAbility, Assessment, AssessmentResult, Question, Lesson, Chapter, Answer
 from api.decorators import auth_required
 import os
-from collections import defaultdict
-from api.ai.estimate_student_ability import estimate_ability_irt, estimate_ability_elo
+from api.ai.estimate_student_ability import estimate_ability_irt, estimate_ability_elo, estimate_ability_elo_time
 
 
 @api_view(['GET'])
@@ -430,28 +429,27 @@ def get_assessment_results_questions(request, assessment_id):
             correct=Count('pk', filter=Q(is_correct=True)),
         )
 
-        # Get stats for upper and lower groups
-        upper_correct = Answer.objects.filter(
-            question=question,
-            assessment_result__assessment=assessment,
-            assessment_result__user_id__in=upper_group,
-            is_correct=True
-        ).count()
-
-        lower_correct = Answer.objects.filter(
-            question=question,
-            assessment_result__assessment=assessment,
-            assessment_result__user_id__in=lower_group,
-            is_correct=True
-        ).count()
-
-        upper_proportion = upper_correct / len(upper_group) if upper_group else 0
-        lower_proportion = lower_correct / len(lower_group) if lower_group else 0
-        # upper_percent = upper_proportion * 100 if upper_proportion else 0
-        # lower_percent = lower_proportion * 100 if lower_proportion else 0
-        discrimination = upper_proportion - lower_proportion
-        question.discrimination = discrimination
-        question.save()
+        # upper_correct = Answer.objects.filter(
+        #     question=question,
+        #     assessment_result__assessment=assessment,
+        #     assessment_result__user_id__in=upper_group,
+        #     is_correct=True
+        # ).count()
+        #
+        # lower_correct = Answer.objects.filter(
+        #     question=question,
+        #     assessment_result__assessment=assessment,
+        #     assessment_result__user_id__in=lower_group,
+        #     is_correct=True
+        # ).count()
+        #
+        # upper_proportion = upper_correct / len(upper_group) if upper_group else 0
+        # lower_proportion = lower_correct / len(lower_group) if lower_group else 0
+        # # upper_percent = upper_proportion * 100 if upper_proportion else 0
+        # # lower_percent = lower_proportion * 100 if lower_proportion else 0
+        # discrimination = upper_proportion - lower_proportion
+        # question.discrimination = discrimination
+        #question.save()
 
         questions_data.append({
             "question_id": question.id,
@@ -469,8 +467,8 @@ def get_assessment_results_questions(request, assessment_id):
             },
             "correct_answers": stats['correct'],
             "wrong_answers": stats['total'] - stats['correct'],
-            "percent_correct": stats['correct'] / stats['total'] * 100 if stats['total'] else 0,
-            "discrimination": discrimination,
+            # "percent_correct": stats['correct'] / stats['total'] * 100 if stats['total'] else 0,
+            # "discrimination": discrimination,
         })
 
     return Response({
@@ -716,8 +714,9 @@ def estimate_ability_students(request, class_id):
 
         assessment = Assessment.objects.filter(class_owner_id=class_id, is_initial=True).first()
         if AssessmentResult.objects.filter(assessment=assessment, user=student).exists():
-            estimate_ability_irt(student.id)
+            # estimate_ability_irt(student.id)
             # estimate_ability_elo(student.id)
+            estimate_ability_elo_time(student.id)
 
             user_abilities = UserAbility.objects.filter(user_id=student.id)
             irt_abilities = {
@@ -728,11 +727,16 @@ def estimate_ability_students(request, class_id):
                 user_ability.category.name: user_ability.elo_ability for user_ability in user_abilities
             }
 
+            elo_time_abilities = {
+                user_ability.category.name: user_ability.elo_time_ability for user_ability in user_abilities
+            }
+
             response_data.append({
                 "id": student.id,
                 "name": student.full_name,
                 "irt": irt_abilities,
                 "elo": elo_abilities,
+                "elo_time": elo_time_abilities
             })
 
     return Response(response_data, status=status.HTTP_200_OK)
