@@ -439,12 +439,12 @@ def take_quiz(request):
     no_of_questions = int(request.data.get('no_of_questions', 5))
     question_source = request.data.get('question_source')
 
-    # thirty_minutes_ago = now() - timedelta(minutes=30)
-    # recent_quiz = Assessment.objects.filter(created_by=user, created_at__gte=thirty_minutes_ago).exists()
-    #
-    # if recent_quiz:
-    #     return Response({'error': 'Student have already taken a quiz within 30 minutes. Please try again later!'},
-    #                     status=status.HTTP_429_TOO_MANY_REQUESTS)
+    thirty_minutes_ago = now() - timedelta(minutes=30)
+    recent_quiz = Assessment.objects.filter(created_by=user, created_at__gte=thirty_minutes_ago).exists()
+
+    if recent_quiz:
+        return Response({'error': 'Student have already taken a quiz within 30 minutes. Please try again later!'},
+                        status=status.HTTP_429_TOO_MANY_REQUESTS)
 
     if question_source == 'previous_exam':
         all_questions = Question.objects.filter(category_id__in=selected_categories)
@@ -491,25 +491,52 @@ def take_quiz(request):
 
 @api_view(['GET'])
 @auth_required("student")
+def lesson_assessment_limit(request, lesson_id):
+    user: User = request.user
+    lesson = get_object_or_404(Lesson, id=lesson_id)
+
+    attempts_count = AssessmentResult.objects.filter(
+        user=user,
+        assessment__lesson=lesson,
+        assessment__class_owner=user.enrolled_class
+    ).count()
+
+    max_attempts = 3
+    remaining_attempts = max(max_attempts - attempts_count, 0)
+
+    return Response({
+        "remaining_attempts": remaining_attempts,
+        "max_attempts": max_attempts
+    })
+
+
+@api_view(['GET'])
+@auth_required("student")
 def take_lesson_assessment(request, lesson_id):
     user: User = request.user
     lesson = get_object_or_404(Lesson, id=lesson_id)
     lesson_category = get_object_or_404(Category, name=lesson.name)
 
-    thirty_minutes_ago = now() - timedelta(minutes=30)
-    recent_quiz = Assessment.objects.filter(lesson=lesson, class_owner=user.enrolled_class,
-                                            created_at__gte=thirty_minutes_ago).exists()
+    # Check if the student has exceeded attempts
+    attempts_count = AssessmentResult.objects.filter(
+        user=user,
+        assessment__lesson=lesson,
+        assessment__class_owner=user.enrolled_class
+    ).count()
 
-    if recent_quiz:
-        return Response({'error': 'Student have already taken a quiz within 30 minutes. Please try again later!'},
-                        status=status.HTTP_429_TOO_MANY_REQUESTS)
+    max_attempts = 3
+    if attempts_count >= max_attempts:
+        return Response(
+            {"error": "Maximum of 3 quiz attempts reached."},
+            status=status.HTTP_403_FORBIDDEN
+        )
 
-    no_of_questions = 20
+    no_of_questions = 1
     all_questions = list(Question.objects.filter(category_id=lesson_category.id))
     selected_questions = random.sample(list(all_questions), no_of_questions)
 
     lesson_assessment = Assessment.objects.create(
-        name=f'Lesson Quiz: {lesson.name}',
+        name=f'Lesson Quiz: {lesson.name} Attempt {attempts_count + 1}',
         lesson=lesson,
         class_owner=user.enrolled_class,
         type='quiz',
@@ -537,19 +564,45 @@ def take_lesson_assessment(request, lesson_id):
 
     return Response(quiz_data, status=status.HTTP_201_CREATED)
 
+@api_view(['GET'])
+@auth_required("student")
+def chapter_assessment_limit(request, chapter_id):
+    user: User = request.user
+    chapter = get_object_or_404(Chapter, id=chapter_id)
+
+    attempts_count = AssessmentResult.objects.filter(
+        user=user,
+        assessment__chapter=chapter,
+        assessment__class_owner=user.enrolled_class
+    ).count()
+
+    max_attempts = 3
+    remaining_attempts = max(max_attempts - attempts_count, 0)
+
+    return Response({
+        "remaining_attempts": remaining_attempts,
+        "max_attempts": max_attempts
+    })
 
 @api_view(['GET'])
 @auth_required("student")
 def take_chapter_assessment(request, chapter_id):
     user: User = request.user
     chapter = get_object_or_404(Chapter, id=chapter_id)
-    thirty_minutes_ago = now() - timedelta(minutes=30)
-    recent_quiz = Assessment.objects.filter(chapter=chapter, class_owner=user.enrolled_class,
-                                            created_at__gte=thirty_minutes_ago).exists()
 
-    if recent_quiz:
-        return Response({'error': 'Student have already taken a quiz within 30 minutes. Please try again later!'},
-                        status=status.HTTP_429_TOO_MANY_REQUESTS)
+    # Check if the student has exceeded attempts
+    attempts_count = AssessmentResult.objects.filter(
+        user=user,
+        assessment__chapter=chapter,
+        assessment__class_owner=user.enrolled_class
+    ).count()
+
+    max_attempts = 3
+    if attempts_count >= max_attempts:
+        return Response(
+            {"error": "Maximum of 3 quiz attempts reached."},
+            status=status.HTTP_403_FORBIDDEN
+        )
 
     no_of_questions = 20
     all_questions = list(Question.objects.filter(category__subcategory__name=chapter.name))

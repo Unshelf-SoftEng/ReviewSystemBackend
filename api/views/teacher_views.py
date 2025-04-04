@@ -385,28 +385,27 @@ def get_assessment_results_questions(request, assessment_id):
         is_active=True
     )
 
-    # Get all students who took the assessment
     student_ids = User.objects.filter(
         enrolled_class=assessment.class_owner
     ).values_list('id', flat=True)
 
-    # First get total scores for all students to determine high/low performers
-    student_scores = {}
-    for student_id in student_ids:
-        total_score = Answer.objects.filter(
-            assessment_result__assessment=assessment,
-            assessment_result__user_id=student_id,
-            is_correct=True
-        ).count()
-        student_scores[student_id] = total_score
 
-    sorted_scores = sorted(student_scores.items(), key=lambda x: x[1], reverse=True)
-    num_students = len(sorted_scores)
-    upper_cutoff = int(num_students * 0.25)
-    lower_cutoff = int(num_students * 0.75)
+    # student_scores = {}
+    # for student_id in student_ids:
+    #     total_score = Answer.objects.filter(
+    #         assessment_result__assessment=assessment,
+    #         assessment_result__user_id=student_id,
+    #         is_correct=True
+    #     ).count()
+    #     student_scores[student_id] = total_score
 
-    upper_group = [x[0] for x in sorted_scores[:upper_cutoff]]
-    lower_group = [x[0] for x in sorted_scores[lower_cutoff:]]
+    # sorted_scores = sorted(student_scores.items(), key=lambda x: x[1], reverse=True)
+    # num_students = len(sorted_scores)
+    # upper_cutoff = int(num_students * 0.25)
+    # lower_cutoff = int(num_students * 0.75)
+
+    # upper_group = [x[0] for x in sorted_scores[:upper_cutoff]]
+    # lower_group = [x[0] for x in sorted_scores[lower_cutoff:]]
 
     questions_data = []
     count = 1
@@ -449,7 +448,7 @@ def get_assessment_results_questions(request, assessment_id):
         # # lower_percent = lower_proportion * 100 if lower_proportion else 0
         # discrimination = upper_proportion - lower_proportion
         # question.discrimination = discrimination
-        #question.save()
+        # question.save()
 
         questions_data.append({
             "question_id": question.id,
@@ -502,7 +501,6 @@ def update_assessment(request, assessment_id):
             question.correct_answer = question_data["answer"]
             updated_questions.append(question)
 
-    # Bulk update all modified questions in one query
     if updated_questions:
         Question.objects.bulk_update(updated_questions, ["question_text", "choices", "correct_answer"])
 
