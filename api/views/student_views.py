@@ -185,6 +185,7 @@ def initial_exam_taken(request):
         return Response({'status': 'ongoing'}, status=status.HTTP_200_OK)
 
 
+
 @api_view(['GET'])
 @auth_required("student")
 def take_initial_exam(request):
