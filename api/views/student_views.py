@@ -579,7 +579,7 @@ def take_lesson_assessment(request, lesson_id):
                 'question_id': question.id,
                 'image_url': question.image_url,
                 'question_text': question.question_text,
-                'choices': question.choices
+                'choices': list(question.choices.values())
             }
             for question in selected_questions
         ]
@@ -654,7 +654,7 @@ def take_chapter_assessment(request, chapter_id):
                 'question_id': question.id,
                 'image_url': question.image_url,
                 'question_text': question.question_text,
-                'choices': question.choices
+                'choices': list(question.choices.values())
             }
             for question in selected_questions
         ]
@@ -697,7 +697,7 @@ def take_teacher_assessment(request, assessment_id):
                 'question_id': question.id,
                 'image_url': question.image_url,
                 'question_text': question.question_text,
-                'choices': question.choices
+                'choices': list(question.choices.values())
             }
             for question in assessment.questions.all()
         ]
