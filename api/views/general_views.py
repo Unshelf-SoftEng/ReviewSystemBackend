@@ -32,11 +32,13 @@ def is_accepted_email(email):
         return True
     
     # Check if it's one of your accepted emails (with or without aliases)
-    local_part, domain = email.split("@")
+    if '@' not in email:  
+        return False
+        
+    local_part, domain = email.split('@', 1)  # Only split on first @
     base_email = f"{local_part.split('+')[0]}@{domain}"
     
     return base_email in ACCEPTED_EMAILS
-
 
 def normalize_email(email):
     """Normalizes @cit.edu emails by removing + aliases."""
@@ -93,9 +95,11 @@ def register_teacher(request):
 @api_view(['POST'])
 def register_user(request):
     data = request.data
-    original_email = data.get('email')
-
     email = data.get('email', '').lower().strip()
+
+    if not is_accepted_email(email):  # Add this new function (shown below)
+        return Response({'error': 'Only @cit.edu emails or pre-approved emails are allowed'},
+                    status=status.HTTP_400_BAD_REQUEST)
 
     if not is_accepted_email(email):  # Add this new function (shown below)
         return Response({'error': 'Only @cit.edu emails or pre-approved emails are allowed'},
