@@ -131,9 +131,6 @@ class AssessmentResult(models.Model):
     is_submitted = models.BooleanField(default=False)
     question_order = JSONField(blank=True, null=True)
 
-    class Meta:
-        unique_together = ('assessment', 'user')
-
     def __str__(self):
         return f'{self.user} scored {self.score} on {self.assessment}'
 

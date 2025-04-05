@@ -19,13 +19,28 @@ def auth_required(*allowed_roles):
                 return Response({'error': 'Authentication required. Please log in again'},
                                 status=status.HTTP_401_UNAUTHORIZED)
 
+            print('Token found')
+
             try:
                 if token:
                     try:
+
+                        print('Checking for user data')
                         user_data = supabase_client.auth.get_user(jwt=token)
+
+                        print("User Data:", user_data)
+
+
+
                         if user_data and user_data.user:
+
                             supabase_uid = user_data.user.id
+
+                            print("Supabase_uid", supabase_uid)
+
                             user = get_object_or_404(User, supabase_user_id=supabase_uid)
+
+
 
                             if allowed_roles and user.role not in allowed_roles:
                                 return Response({"error": "You are not allowed to access this resource"},
