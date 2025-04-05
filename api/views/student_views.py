@@ -942,11 +942,14 @@ def submit_class_assessment(request, assessment_id):
 @api_view(['GET'])
 @auth_required("student")
 def get_assessment_result(request, assessment_id):
-    user: User = request.user
+    user = request.user
     result = AssessmentResult.objects.select_related('assessment', 'user').prefetch_related(
         Prefetch('answers', queryset=Answer.objects.select_related('question__category')),
         Prefetch('assessment__questions', queryset=Question.objects.select_related('category'))
-    ).filter(assessment__id=assessment_id, user=user).first()
+    ).filter(
+        assessment__id=assessment_id,
+        user=request.user
+    ).order_by('-id').first()
 
     if result is None:
         return Response({'error': 'No Result for Assessment Found'}, status=status.HTTP_404_NOT_FOUND)
