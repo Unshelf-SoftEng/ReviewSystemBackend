@@ -182,7 +182,14 @@ def initial_exam_taken(request):
     if result.is_submitted:
         return Response({'status': 'taken'}, status=status.HTTP_200_OK)
     else:
-        return Response({'status': 'ongoing'}, status=status.HTTP_200_OK)
+        current_time = timezone.now()
+        time_limit_end = result.start_time + result.assessment.time_limit
+        deadline = result.deadline
+
+        if current_time >= time_limit_end or (deadline and current_time >= deadline):
+            return Response({'status': 'taken'}, status=status.HTTP_200_OK)
+        else:
+            return Response({'status': 'ongoing'}, status=status.HTTP_200_OK)
 
 
 
@@ -533,7 +540,6 @@ def take_lesson_assessment(request, lesson_id):
     lesson = get_object_or_404(Lesson, id=lesson_id)
     lesson_category = get_object_or_404(Category, name=lesson.name)
 
-    # Check if the student has exceeded attempts
     attempts_count = AssessmentResult.objects.filter(
         user=user,
         assessment__lesson=lesson,
