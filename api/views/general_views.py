@@ -18,11 +18,24 @@ def load_accepted_emails():
         with open(accepted_emails_path, "r") as f:
             return set(email.strip().lower() for email in f.readlines())
     except FileNotFoundError:
-        print("Did not found accepted emails file.")
+        print("Did not find accepted emails file.")
         return set()
 
-
 ACCEPTED_EMAILS = load_accepted_emails()
+
+def is_accepted_email(email):
+    """Check if email is either @cit.edu or an accepted email with optional aliasing."""
+    email = email.lower().strip()
+    
+    # Check for @cit.edu first
+    if email.endswith("@cit.edu"):
+        return True
+    
+    # Check if it's one of your accepted emails (with or without aliases)
+    local_part, domain = email.split("@")
+    base_email = f"{local_part.split('+')[0]}@{domain}"
+    
+    return base_email in ACCEPTED_EMAILS
 
 
 def normalize_email(email):
@@ -81,14 +94,12 @@ def register_teacher(request):
 def register_user(request):
     data = request.data
     original_email = data.get('email')
-    email = normalize_email(original_email)
 
-    if not email.endswith("@cit.edu") and email not in ACCEPTED_EMAILS:
-        return Response({'error': 'Only @cit.edu emails are allowed'},
-                        status=status.HTTP_400_BAD_REQUEST)
+    email = data.get('email', '').lower().strip()
 
-    if email in ACCEPTED_EMAILS:
-        email = original_email
+    if not is_accepted_email(email):  # Add this new function (shown below)
+        return Response({'error': 'Only @cit.edu emails or pre-approved emails are allowed'},
+                   status=status.HTTP_400_BAD_REQUEST)
 
     password = data.get('password')
     first_name = data.get('first_name')
