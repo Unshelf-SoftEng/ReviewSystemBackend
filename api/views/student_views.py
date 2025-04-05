@@ -141,7 +141,6 @@ def get_dashboard_data(request):
     return Response(response_data, status=status.HTTP_200_OK)
 
 
-
 @api_view(['GET'])
 @auth_required("student")
 def get_initial_exam(request):
@@ -190,21 +189,24 @@ def initial_exam_taken(request):
 @auth_required("student")
 def take_initial_exam(request):
     user: User = request.user
-    current_time = timezone.now()
-
-    exam = Assessment.objects.filter(
-        class_owner=user.enrolled_class, is_initial=True, is_active=True
-    ).select_related("class_owner").prefetch_related("questions").only("id", "time_limit", "deadline",
-                                                                       "class_owner").first()
 
     if user.enrolled_class is None:
         return Response({'error': "Student is not enrolled in any class"}, status=status.HTTP_403_FORBIDDEN)
+
+    exam = Assessment.objects.filter(
+        class_owner=user.enrolled_class,
+        is_initial=True,
+        is_active=True
+    ).select_related("class_owner").prefetch_related("questions").only("id", "time_limit", "deadline",
+                                                                       "class_owner").first()
 
     if not exam:
         return Response({"error": "Initial Exam doesn't exist"}, status=status.HTTP_404_NOT_FOUND)
 
     if not exam.deadline:
         return Response({'error': 'Initial Exam is not open'}, status=status.HTTP_400_BAD_REQUEST)
+
+    current_time = timezone.now()
 
     if exam.deadline < current_time:
         return Response({'error': 'Initial Exam deadline has already passed'}, status=status.HTTP_400_BAD_REQUEST)
@@ -224,22 +226,29 @@ def take_initial_exam(request):
     if result.is_submitted:
         return Response({'error': 'Student has already taken the exam.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    questions = list(exam.questions.values("id", "image_url", "question_text", "choices"))
-    random.shuffle(questions)
+    questions_qs = exam.questions.all().values("id", "image_url", "question_text", "choices")
+    questions_dict = {q["id"]: q for q in questions_qs}
+
+    if not result.question_order:
+        question_list = list(questions_dict.values())
+        random.shuffle(question_list)
+        result.question_order = [q["id"] for q in question_list]
+        result.save()
+    else:
+        question_list = [questions_dict[qid] for qid in result.question_order if qid in questions_dict]
 
     answers = Answer.objects.filter(assessment_result=result)
 
-    # Convert answers into a dictionary for quick lookup
     answers_dict = {
         answer.question_id: {
-            'chosen_answer': answer.chosen_answer,  # The user's selected choice
-            'time_spent': answer.time_spent  # Optional: Include time taken
+            'chosen_answer': answer.chosen_answer,
+            'time_spent': answer.time_spent
         }
         for answer in answers
     }
 
     questions_data = []
-    for question in questions:
+    for question in question_list:
         question_data = {
             'question_id': question["id"],
             'image_url': question["image_url"],
@@ -259,10 +268,10 @@ def take_initial_exam(request):
 
     exam_data = {
         'exam_id': exam.id,
-        'no_of_items': len(questions),
+        'no_of_items': len(question_list),
         'time_limit': int(remaining_time),
         'questions': questions_data,
-        'question_ids': [q["id"] for q in questions],
+        'question_ids': [q["id"] for q in question_list],
     }
 
     return Response(exam_data, status=status.HTTP_200_OK)
@@ -570,6 +579,7 @@ def take_lesson_assessment(request, lesson_id):
 
     return Response(quiz_data, status=status.HTTP_201_CREATED)
 
+
 @api_view(['GET'])
 @auth_required("student")
 def chapter_assessment_limit(request, chapter_id):
@@ -589,6 +599,7 @@ def chapter_assessment_limit(request, chapter_id):
         "remaining_attempts": remaining_attempts,
         "max_attempts": max_attempts
     })
+
 
 @api_view(['GET'])
 @auth_required("student")

@@ -1,5 +1,6 @@
 from django.db import models
 from .utils.util import generate_class_code
+from django.db.models import JSONField
 
 
 class User(models.Model):
@@ -128,6 +129,7 @@ class AssessmentResult(models.Model):
     time_taken = models.IntegerField(default=0, editable=False)
     last_activity = models.DateTimeField(auto_now=True)
     is_submitted = models.BooleanField(default=False)
+    question_order = JSONField(blank=True, null=True)
 
     class Meta:
         unique_together = ('assessment', 'user')
