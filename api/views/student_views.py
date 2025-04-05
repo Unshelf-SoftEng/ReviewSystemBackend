@@ -168,16 +168,22 @@ def get_initial_exam(request):
 def initial_exam_taken(request):
     user: User = request.user
 
-    if user.enrolled_class:
-        exists = AssessmentResult.objects.filter(
-            assessment__class_owner=user.enrolled_class,
-            assessment__is_initial=True,
-            user=user
-        ).exists()
-
-        return Response({'taken': exists}, status=status.HTTP_200_OK)
-    else:
+    if not user.enrolled_class:
         return Response({"error": "Student is not enrolled to a class"}, status=status.HTTP_403_FORBIDDEN)
+
+    result = AssessmentResult.objects.filter(
+        assessment__class_owner=user.enrolled_class,
+        assessment__is_initial=True,
+        user=user
+    ).first()
+
+    if not result:
+        return Response({'status': 'not_taken'}, status=status.HTTP_200_OK)
+
+    if result.is_submitted:
+        return Response({'status': 'taken'}, status=status.HTTP_200_OK)
+    else:
+        return Response({'status': 'ongoing'}, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
