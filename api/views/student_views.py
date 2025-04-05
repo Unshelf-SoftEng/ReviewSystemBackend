@@ -171,7 +171,8 @@ def initial_exam_taken(request):
         exists = AssessmentResult.objects.filter(
             assessment__class_owner=user.enrolled_class,
             assessment__is_initial=True,
-            user=user
+            user=user,
+            is_submitted=True
         ).exists()
 
         return Response({'taken': exists}, status=status.HTTP_200_OK)
