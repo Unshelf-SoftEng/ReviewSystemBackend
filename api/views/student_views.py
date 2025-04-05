@@ -700,7 +700,8 @@ def take_teacher_assessment(request, assessment_id):
                 'choices': list(question.choices.values())
             }
             for question in assessment.questions.all()
-        ]
+        ],
+        'attempts': attempts_count
     }
 
     return Response(quiz_data, status=status.HTTP_200_OK)
