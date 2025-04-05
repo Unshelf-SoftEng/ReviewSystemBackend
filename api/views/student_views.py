@@ -183,13 +183,14 @@ def initial_exam_taken(request):
         return Response({'status': 'taken'}, status=status.HTTP_200_OK)
 
     current_time = timezone.now()
-    time_limit_end = result.start_time + result.assessment.time_limit
-    deadline = result.deadline
+    time_limit_end = result.start_time + timedelta(seconds=result.assessment.time_limit)
+    deadline = result.assessment.deadline
 
     if current_time >= time_limit_end or (deadline and current_time >= deadline):
-        # Auto-submit if time limit/deadline passed
+
+        print('Was here')
         result.is_submitted = True
-        result.save()  # Save the modified status
+        result.save()
         return Response({'status': 'taken'}, status=status.HTTP_200_OK)
     else:
         return Response({'status': 'ongoing'}, status=status.HTTP_200_OK)

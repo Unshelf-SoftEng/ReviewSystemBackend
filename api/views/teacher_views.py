@@ -486,6 +486,7 @@ def update_assessment(request, assessment_id):
     questions = request.data.get("questions", [])
 
     if "deadline" in request.data:
+        print("Deadline", request.data["deadline"])
         assessment.deadline = parse_datetime(request.data["deadline"]) if request.data["deadline"] else None
         assessment.save(update_fields=["deadline"])
 
