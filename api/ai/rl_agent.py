@@ -1,4 +1,3 @@
-import base64
 import pickle
 import numpy as np
 from collections import deque
@@ -8,6 +7,7 @@ from tensorflow.keras.optimizers import Adam
 from api.models import RLAgentState, Question, AssessmentResult, User, Category
 import random
 import os
+import math
 
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 
@@ -139,7 +139,8 @@ def update_rl_model(rl_agent, assessment_id, user, batch_size=32):
     if not answers:
         return {}
 
-    ability_map = {ua.category.id: ua.elo_ability for ua in user.user_abilities.all()}
+    # Map to UserAbility instances (so we can update their elo_ability)
+    ability_map = {ua.category.id: ua for ua in user.user_abilities.all()}
     categories = Category.objects.all()
 
     total_reward = 0
@@ -150,16 +151,33 @@ def update_rl_model(rl_agent, assessment_id, user, batch_size=32):
         category = question.category
         category_id = category.id
 
-        user_elo = ability_map.get(category_id)
+        user_ability = ability_map.get(category_id)
+        if user_ability is None:
+            continue  # skip if no UserAbility yet
+
+        user_elo = user_ability.elo_ability
         difficulty = question.elo_difficulty
         correctness = answer.is_correct
 
-        expected = 1 / (1 + 10 ** ((difficulty - user_elo) / 400))
-        reward = 32 * (correctness - expected)
+        k = 32
+        num_choices = 4
+
+        # Shifted logistic model (with 1/4 guessing base)
+        base_probability = 1 / num_choices
+        logistic_component = 1 / (1 + math.exp(-(user_elo - difficulty)))
+        expected = base_probability + (1 - base_probability) * logistic_component
+
+        reward = k * (correctness - expected)
         total_reward += reward
 
+        # Update UserAbility's Elo rating
+        user_ability.elo_ability = round(user_elo + reward)
+        user_ability.save()  # Save immediately
+
+        # Build RL state
         ability_vector = np.array([
-            ability_map.get(cat.id, 0) for cat in sorted(categories, key=lambda x: x.id)[:9]
+            ability_map.get(cat.id, None).elo_ability if ability_map.get(cat.id) else 0
+            for cat in sorted(categories, key=lambda x: x.id)[:9]
         ], dtype=np.float32)
 
         difficulty_array = np.array([difficulty], dtype=np.float32)
@@ -176,9 +194,12 @@ def update_rl_model(rl_agent, assessment_id, user, batch_size=32):
 
         state_transitions.append((state, reward))
 
+    # Train the RL agent
     for state, reward in state_transitions:
         next_state = state.copy()
         rl_agent.remember(state, reward, next_state, False)
 
     rl_agent.replay(batch_size)
+
+    # Return the full original ability_map (updated objects)
     return ability_map

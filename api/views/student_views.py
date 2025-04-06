@@ -1467,7 +1467,6 @@ def get_final_exam(request):
 
     return Response(exam_data, status=status.HTTP_200_OK)
 
-
 @api_view(['GET'])
 @auth_required("student")
 def final_exam_taken(request):

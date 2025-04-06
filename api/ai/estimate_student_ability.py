@@ -92,6 +92,7 @@ def estimate_ability_elo(user_id):
     Estimate and update student ability using the Elo rating system.
     """
     k = 32
+    num_choices = 4
     user = User.objects.get(pk=user_id)
     assessment = Assessment.objects.get(class_owner=user.enrolled_class, is_initial=True, is_active=True)
 
@@ -126,7 +127,10 @@ def estimate_ability_elo(user_id):
                 else:
                     adjusted_difficulty = 1750
 
-                expected_score = 1 / (1 + 10 ** ((adjusted_difficulty - user_ability.elo_ability) / 400))
+                base_probability = 1 / num_choices
+                logistic_component = 1 / (1 + math.exp(-(user_ability.elo_ability - adjusted_difficulty)))
+                expected_score = base_probability + (1 - base_probability) * logistic_component
+
                 actual_score = 1 if answer.is_correct else 0
 
                 if user_ability.elo_ability is None:
@@ -167,21 +171,17 @@ def estimate_ability_elo_time(user_id):
                 difficulty = answer.question.ai_difficulty
                 adjusted_ai_difficulty = 1250 if difficulty == 1 else 1500 if difficulty == 2 else 1750
 
-                # Expected vs. actual log-time (scaled)
                 expected_log_time = (adjusted_ai_difficulty - user_ability.elo_time_ability) / time_scale_factor
                 actual_time = max(answer.time_spent, 1)  # Avoid log(0)
                 actual_log_time = math.log(actual_time) / time_scale_factor
                 time_score = (expected_log_time - actual_log_time)  # Now in reasonable range
 
-                # Correctness term (unchanged)
                 expected_correct = 1 / (1 + 10 ** ((adjusted_ai_difficulty - user_ability.elo_time_ability) / 400))
                 actual_correct = 1 if answer.is_correct else 0
                 correctness_score = (actual_correct - expected_correct)
 
-                # Combined update (weighted)
                 combined_update = k * (0.7 * correctness_score + 0.3 * time_score)
 
-                # Apply update
                 user_ability.elo_time_ability += combined_update
 
                 print(
