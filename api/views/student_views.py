@@ -88,7 +88,7 @@ def join_class(request):
 @auth_required("student")
 def get_dashboard_data(request):
     user: User = request.user
-    lessons = Lesson.objects.only("id", "name", "is_locked")
+    lessons = Lesson.objects.only("id", "name", "is_locked").order_by("id")
 
     lesson_data = [
         {

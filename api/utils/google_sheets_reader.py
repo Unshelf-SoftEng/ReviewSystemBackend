@@ -274,15 +274,19 @@ def upload_lessons_from_sheet(lesson_spreadsheet_id, lesson_range, chapter_sprea
         section_id, chapter_id, section_number, section_name, content = row
         chapter = chapters.get(chapter_id)
         if chapter:
-            section, updated = Section.objects.update_or_create(
-                id=section_id,
-                chapter=chapter,
-                number=section_number,
-                defaults={
-                    'name': section_name,
-                    'content': content
-                }
-            )
+            section = Section.objects.filter(id=section_id).first()
+            if section:
+                section.name = section_name
+                section.content = content
+                section.save()
+            else:
+                section = Section.objects.create(
+                    id=section_id,
+                    chapter=chapter,
+                    number=section_number,
+                    name=section_name,
+                    content=content
+                )
 
-        print(
-            f"Uploaded: {chapter.lesson.name} -> {chapter.number}. {chapter.name} -> Section {section_number}: {section_name}")
+            print(
+                f"Uploaded: {chapter.lesson.name} -> {chapter.number}. {chapter.name} -> Section {section_number}: {section_name}")
