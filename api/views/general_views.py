@@ -300,20 +300,21 @@ def get_user_details(request):
 
 
 @api_view(['POST'])
-@auth_required()
 def reset_password(request):
     data = request.data
     email = data.get('email')
     supabase = get_supabase_client()
 
+    verified = supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'email'})
+
     supabase.auth.reset_password_for_email(
         email,
         {
-            "redirect_to": "http://localhost:8000/api/update-password",
+            "redirect_to": "https://nits-adaptive-nine.vercel.app/update-password",
         }
     )
 
-    return Response({'message': 'Reset email was sent successfully'}, status=status.HTTP_200_OK)
+    return Response({'message': 'Reset email was sent successfully', 'verified': verified}, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
