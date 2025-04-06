@@ -12,6 +12,7 @@ from django.shortcuts import get_object_or_404
 from api.decorators import auth_required
 from datetime import timedelta
 from django.utils.timezone import now
+from api.ai.rl_agent import DQNAgent, generate_quiz_with_rl
 
 AUTO_SUBMISSION_GRACE_PERIOD = 30
 
@@ -465,20 +466,28 @@ def take_quiz(request):
     no_of_questions = int(request.data.get('no_of_questions', 5))
     question_source = request.data.get('question_source')
 
-    thirty_minutes_ago = now() - timedelta(minutes=30)
-    recent_quiz = Assessment.objects.filter(created_by=user, created_at__gte=thirty_minutes_ago).exists()
-
-    if recent_quiz:
-        return Response({'error': 'Student have already taken a quiz within 30 minutes. Please try again later!'},
-                        status=status.HTTP_429_TOO_MANY_REQUESTS)
+    # thirty_minutes_ago = now() - timedelta(minutes=30)
+    # recent_quiz = Assessment.objects.filter(created_by=user, created_at__gte=thirty_minutes_ago).exists()
+    #
+    # if recent_quiz:
+    #     return Response({'error': 'Student has already taken a quiz within 30 minutes. Please try again later!'},
+    #                     status=status.HTTP_429_TOO_MANY_REQUESTS)
 
     if question_source == 'previous_exam':
         all_questions = Question.objects.filter(category_id__in=selected_categories)
         selected_questions = random.sample(list(all_questions), no_of_questions)
 
     elif question_source == 'ai_generated':
-        return Response({'message': 'AI-generated questions feature has not been implemented yet.'},
-                        status=status.HTTP_501_NOT_IMPLEMENTED)
+        rl_agent = DQNAgent()
+
+        categories = Category.objects.filter(id__in=selected_categories)
+        user_abilities = UserAbility.objects.filter(user=user, category__id__in=selected_categories)
+
+        elo_abilities = {}
+        for ability in user_abilities:
+            elo_abilities[ability.category.name] = ability.elo_ability
+
+        selected_questions = generate_quiz_with_rl(rl_agent, elo_abilities, categories, no_of_questions)
     else:
         return Response({'message': 'AI-generated questions feature has not been implemented yet.'},
                         status=status.HTTP_501_NOT_IMPLEMENTED)
@@ -495,7 +504,7 @@ def take_quiz(request):
 
     quiz.questions.set(selected_questions)
     quiz.selected_categories.set(categories)
-    quiz.save()
+    # quiz.save()
 
     AssessmentResult.objects.create(assessment=quiz, user=user, start_time=now())
 
@@ -1167,7 +1176,6 @@ def get_class_assessment_result(request, assessment_id):
 def get_ability(request):
     user: User = request.user
 
-    estimate_ability_irt(user.id)
     estimate_ability_elo(user.id)
 
     user_abilities = UserAbility.objects.filter(user_id=user.id)
@@ -1180,7 +1188,7 @@ def get_ability(request):
     }
 
     return Response({
-        "abilities": irt_abilities,
+        # "abilities": irt_abilities,
         "elo_abilities": elo_abilities
     }, status=status.HTTP_200_OK)
 

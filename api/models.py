@@ -169,7 +169,7 @@ class Class(models.Model):
 class Lesson(models.Model):
     name = models.CharField(max_length=255)
     is_locked = models.BooleanField(default=False)
-    
+
     def __str__(self):
         return self.name
 
@@ -210,3 +210,11 @@ class LessonProgress(models.Model):
 
     def __str__(self):
         return f"{self.user.full_name} - {self.lesson.name} | Chapter: {self.current_chapter} | Section: {self.current_section}"
+
+
+class RLAgentState(models.Model):
+    state = models.JSONField()
+    model_weights = models.BinaryField()
+
+    def __str__(self):
+        return "Global RL agent state"
