@@ -1,223 +1,184 @@
+import base64
+import pickle
 import numpy as np
-import random
 from collections import deque
-
 from tensorflow.keras import Sequential, Input
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.optimizers import Adam
-from scipy.special import softmax
-from api.models import Question  # Import Django model
+from api.models import RLAgentState, Question, AssessmentResult, User, Category
+import random
 
 
 class DQNAgent:
+    _instance = None
 
-    def __init__(self, state_size, action_size, ability_estimate=None):
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super(DQNAgent, cls).__new__(cls, *args, **kwargs)
+            cls._instance._initialize_agent()
+        return cls._instance
 
-        self.state_size = state_size  # Size of the state vector
-        self.action_size = action_size  # Number of possible actions (question sets)
-        self.memory = deque(maxlen=2000)  # Memory buffer for experience replay
-        self.gamma = 0.95  # Discount factor for future rewards
-        self.epsilon = 1.0  # Exploration rate
-        self.epsilon_min = 0.01  # Minimum exploration rate
-        self.epsilon_decay = 0.995  # Decay rate for exploration
-        self.learning_rate = 0.001  # Learning rate for the neural network
-        self.model = self._build_model()  # Build the DQN model
-
-        # Initialize the state based on the ability estimate (if provided)
-        if ability_estimate is not None:
-            self.state = np.array(ability_estimate)  # Set state with ability estimate
-        else:
-            self.state = np.zeros(self.state_size)  # Default to zero if no ability estimate is given
-
-        # Optionally, store this initial state as the first memory (experience)
-        self.remember([], 0, self.state, done=True)
+    def _initialize_agent(self):
+        self.state_size = 19
+        self.action_size = 1  # Q-value for selection score
+        self.memory = deque(maxlen=2000)
+        self.gamma = 0.95
+        self.epsilon = 1.0
+        self.epsilon_min = 0.01
+        self.epsilon_decay = 0.995
+        self.learning_rate = 0.001
+        self.model = self._build_model()
+        self.state = np.zeros(self.state_size)
+        self.load_state_from_db()
 
     def _build_model(self):
-        model = Sequential()
-        model.add(Input(shape=(self.state_size,)))
-        model.add(Dense(24, activation='relu'))
-        model.add(Dense(24, activation='relu'))
-        model.add(Dense(self.action_size, activation='linear'))
-        model.compile(loss='mse', optimizer=Adam(learning_rate=self.learning_rate))
+        model = Sequential([
+            Input(shape=(self.state_size,)),
+            Dense(24, activation='relu'),
+            Dense(24, activation='relu'),
+            Dense(self.action_size, activation='linear')
+        ])
+        model.compile(loss='mse', optimizer=Adam(self.learning_rate))
         return model
 
-    def remember(self, action, reward, next_state, done):
-        self.memory.append((self.state, action, reward, next_state, done))
+    def save_state_to_db(self):
+        print('Saving model to db')
+        model_weights = pickle.dumps(self.model.get_weights())
+        state = self.state.tolist()
+        memory = pickle.dumps(list(self.memory))  # Convert deque to list first
 
-    def act(self, question_probs):
-        question_ids = np.array(list(question_probs.keys()))
-        prob_values = np.array(list(question_probs.values()))
+        RLAgentState.objects.update_or_create(
+            pk=1,
+            defaults={
+                'state': state,
+                'model_weights': model_weights,
+                'memory': memory
+            }
+        )
 
-        if prob_values.sum() == 0 or np.isnan(prob_values).any():
-            prob_values = np.ones_like(prob_values) / len(prob_values)  # Assign equal probability
-        else:
-            prob_values /= prob_values.sum()  # Normalize
+    def load_state_from_db(self):
+        print('Loading model from db')
+        try:
+            agent_state = RLAgentState.objects.get(pk=1)
+            self.state = np.array(agent_state.state)
+            self.model.set_weights(pickle.loads(agent_state.model_weights))
 
-        if np.random.rand() <= self.epsilon:
-            return np.random.choice(question_ids, p=prob_values)  # Exploration
+            if agent_state.memory:
+                self.memory = deque(pickle.loads(agent_state.memory), maxlen=2000)
 
-        # Exploitation: Use Q-values from the model
-        q_values = self.model.predict(np.array(self.state).reshape(1, -1))
+        except RLAgentState.DoesNotExist:
+            pass
 
-        # Use softmax for numerical stability
-        q_values = softmax(q_values[0])
+    def get_batch_scores(self, state_matrix):
+        """
+        Get scores for a batch of states with epsilon-greedy exploration
+        Args:
+            state_matrix: 2D numpy array of shape (n_questions, state_size)
+        Returns:
+            1D array of scores shaped (n_questions)
+        """
+        scores = self.model.predict(state_matrix, verbose=0).flatten()
 
-        # Weight by the actual question probabilities
-        weighted_q_values = q_values * prob_values
+        if self.epsilon > 0:
+            random_mask = np.random.rand(len(scores)) < self.epsilon
+            scores[random_mask] = np.random.rand(np.sum(random_mask))
 
-        # Ensure weighted_q_values is a 1D array before using np.argmax
-        weighted_q_values = np.asarray(weighted_q_values).flatten()
+        return scores
 
-        selected_index = np.argmax(weighted_q_values)
-
-        return question_ids[selected_index]
+    def remember(self, state, reward, next_state, done):
+        self.memory.append((state, reward, next_state, done))
 
     def replay(self, batch_size):
+
         if len(self.memory) < batch_size:
             return
 
         minibatch = random.sample(self.memory, batch_size)
-        for state, action, reward, next_state, done in minibatch:
+
+        for state, reward, next_state, done in minibatch:
             target = reward
             if not done:
-                target = reward + self.gamma * np.amax(self.model.predict(next_state)[0])
-            target_f = self.model.predict(state)
-            target_f[0][action] = target
-            self.model.fit(state, target_f, epochs=1, verbose=0)
+                predicted = self.model.predict(next_state.reshape(1, -1), verbose=0)
+                target += self.gamma * predicted[0][0]
 
-        # Update epsilon (exploration-exploitation balance)
+            self.model.fit(state.reshape(1, -1), np.array([target]), verbose=0)
+
+        self.save_state_to_db()
+
+        # Epsilon decay
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
 
 
-def generate_question_probability(category, theta_k):
-    filtered_questions = Question.objects.filter(category=category)
+def generate_quiz_with_rl(rl_agent, abilities, categories, total_questions):
+    all_questions = Question.objects.filter(category__in=categories)
+    state_matrix = np.zeros((len(all_questions), 19))
+    ability_values = [abilities.get(cat.name, 0) for cat in categories[:9]]
 
-    if not filtered_questions:
-        raise ValueError("No questions available for the specified category.")
+    for i, q in enumerate(all_questions):
+        state_matrix[i, :9] = ability_values
+        state_matrix[i, 9] = q.elo_difficulty
+        state_matrix[i, 10 + q.category.id - 1] = 1
 
-    probabilities = {}
+    scores = rl_agent.get_batch_scores(state_matrix)
+    top_indices = np.argsort(-scores)[:total_questions]
 
-    for question in filtered_questions:
-        b_i = question["difficulty"]  # Difficulty parameter of the question
-        probability = np.exp(-np.abs(b_i - theta_k))  # Probability formula
-        probabilities[question["id"]] = probability
-
-    # Normalize probabilities to sum to 1
-    total_probability = sum(probabilities.values())
-    for question_id in probabilities:
-        probabilities[question_id] /= total_probability
-
-    return probabilities
+    return [all_questions[int(i)] for i in top_indices]
 
 
-def generate_quiz_with_rl(rl_agent, categories, theta_k, num_questions=10):
-    # Collect all question probabilities across categories
-    question_probs = {}
-    for category, ability in zip(categories, theta_k):
-        category_probs = generate_question_probability(category, ability)
-        question_probs.update(category_probs)  # Merge probabilities
+def update_rl_model(rl_agent, assessment_id, user, batch_size=32):
+    user: User = user
+    result = AssessmentResult.objects.filter(assessment__id=assessment_id, user=user).first()
+    if not result:
+        return {}
 
-    # RL selects the questions
-    selected_questions = set()
-    while len(selected_questions) < num_questions:
-        question_id = rl_agent.act(question_probs)
-        selected_questions.add(question_id)
+    answers = result.answers.all()
+    if not answers:
+        return {}
 
-    return list(selected_questions)
+    ability_map = {ua.category.id: ua.elo_ability for ua in user.user_abilities.all()}
+    categories = Category.objects.all()
 
+    total_reward = 0
+    state_transitions = []
 
-def update_learner_ability(responses, theta_k):
-    # Create temporary storage for updates per category
-    category_updates = {category: {"numerator": 0, "denominator": 0} for category in theta_k}
+    for answer in answers:
+        question = answer.question
+        category = question.category
+        category_id = category.id
 
-    for question_id, u_i in responses.items():
-        question = Question.objects.filter(id=question_id).first()
+        user_elo = ability_map.get(category_id)
+        difficulty = question.elo_difficulty
+        correctness = answer.is_correct
 
-        if question is None:
-            print(f"Warning: Question ID {question_id} not found. Skipping.")
-            continue
+        expected = 1 / (1 + 10 ** ((difficulty - user_elo) / 400))
+        reward = 32 * (correctness - expected)
+        total_reward += reward
 
-        category = question["category"]
-        if category not in theta_k:
-            print(f"Warning: Category '{category}' not found in theta_k. Skipping.")
-            continue
+        ability_vector = np.array([
+            ability_map.get(cat.id, 0) for cat in sorted(categories, key=lambda x: x.id)[:9]
+        ], dtype=np.float32)
 
-        # Get IRT parameters
-        a_i = question.get("discrimination", 1.0)
-        b_i = question.get("difficulty", 0.0)
-        c_i = question.get("guessing_rate", 0.25)
+        difficulty_array = np.array([difficulty], dtype=np.float32)
 
-        # Get learner's ability for the category
-        theta_k_value = theta_k[category]
+        one_hot = np.zeros(9, dtype=np.float32)
+        if category_id <= 9:
+            one_hot[category_id - 1] = 1.0
 
-        # 3PL IRT model probability
-        P_i = c_i + (1 - c_i) / (1 + np.exp(-a_i * (theta_k_value - b_i)))
+        state = np.concatenate([
+            ability_vector,
+            difficulty_array,
+            one_hot
+        ])
 
-        # Update numerators and denominators per category
-        category_updates[category]["numerator"] += a_i * (u_i - P_i)
-        category_updates[category]["denominator"] += a_i ** 2 * P_i * (1 - P_i)
+        state_transitions.append((state, reward))
 
-    # Update theta_k for each category
-    for category, update in category_updates.items():
-        if update["denominator"] > 0:
-            theta_k[category] += update["numerator"] / update["denominator"]
-        else:
-            print(f"Warning: No valid updates for category '{category}'.")
+    print(state_transitions)
 
-    return theta_k
+    for state, reward in state_transitions:
+        next_state = state.copy()
+        rl_agent.remember(state, reward, next_state, False)
 
-
-def compute_reward(responses, theta_k):
-    performance_score = 0
-    difficulty_penalty = 0
-    total_questions = len(responses)
-
-    for qid, correctness in responses.items():
-        # Find the question by id in the global 'questions' list
-        question = Question.objects.filter(id=qid).first()
-
-        if question:
-            difficulty = question["difficulty"]
-            category = question["category"]
-
-            learner_ability = theta_k.get(category, 0)  # Use global learner ability (theta_k)
-            ideal_difficulty = learner_ability + 0.1  # Slightly above ability for challenge
-
-            # Add the performance score for correct answers (correctness is 1 or 0)
-            performance_score += difficulty * correctness
-
-            # Calculate the difficulty penalty (larger difference between ideal and real difficulty is worse)
-            difficulty_penalty += abs(difficulty - ideal_difficulty) * 5  # Penalize mismatch
-
-    if total_questions == 0:
-        return 0  # Avoid division by zero
-
-    # Normalize the reward by total questions and subtract the penalty
-    reward = performance_score - (difficulty_penalty / total_questions)
-
-    return reward
-
-
-def update_rl_model(rl_agent, responses, batch_size=32):
-    # Calculate reward (e.g., sum of correct answers)
-    reward = compute_reward(responses)
-
-    # Update learner's ability estimate
-    updated_theta_k = update_learner_ability(responses)
-
-    # Convert theta_k to numpy array for RL state representation
-    next_state = np.array([list(updated_theta_k.values())]).reshape(1, -1)
-    done = False  # Not a terminal state
-
-    # Store experience in RL memory
-    rl_agent.remember(list(responses.keys()), reward, next_state, done)
-
-    # Train the DQN agent if enough memory is available
-    if len(rl_agent.memory) > batch_size:
-        rl_agent.replay(batch_size)
-
-    rl_agent.state = next_state
-
-    return updated_theta_k
+    rl_agent.replay(batch_size)
+    return ability_map
 

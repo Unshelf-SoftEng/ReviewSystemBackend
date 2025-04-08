@@ -91,7 +91,7 @@ def estimate_ability_elo(user_id):
     """
     Estimate and update student ability using the Elo rating system.
     """
-    k = 32
+    k = 0.4
     user = User.objects.get(pk=user_id)
     assessment = Assessment.objects.get(class_owner=user.enrolled_class, is_initial=True, is_active=True)
 
@@ -142,8 +142,8 @@ def estimate_ability_elo(user_id):
 
 
 def estimate_ability_elo_time(user_id):
-    k = 32
-    time_scale_factor = 100  # New: Normalizes time_score to ~same scale as correctness
+    k = 0.4
+    time_scale_factor = 100
     user = User.objects.get(pk=user_id)
     assessment = Assessment.objects.get(class_owner=user.enrolled_class, is_initial=True, is_active=True)
     results = AssessmentResult.objects.filter(user=user, assessment=assessment).order_by('id')

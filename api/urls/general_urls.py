@@ -8,5 +8,6 @@ urlpatterns = [
     path('logout/', general_views.logout_user, name='logout_user'),
     path('auth-user/', general_views.auth_user, name='auth_user'),
     path('profile/', general_views.get_user_details, name='get_user_details'),
-    path('update-password/', general_views.update_password, name='update_password'),
+    path('update-password/<str:access_token>/', general_views.update_password, name='password_update'),
+    path('reset-password/', general_views.reset_password, name='reset_password'),
 ]

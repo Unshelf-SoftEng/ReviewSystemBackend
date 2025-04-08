@@ -9,6 +9,9 @@ from django.utils.timezone import now
 from datetime import timedelta
 from django.conf import settings
 import time
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from api.forms import PasswordUpdateForm
 
 
 def load_accepted_emails():
@@ -21,24 +24,27 @@ def load_accepted_emails():
         print("Did not find accepted emails file.")
         return set()
 
+
 ACCEPTED_EMAILS = load_accepted_emails()
+
 
 def is_accepted_email(email):
     """Check if email is either @cit.edu or an accepted email with optional aliasing."""
     email = email.lower().strip()
-    
+
     # Check for @cit.edu first
     if email.endswith("@cit.edu"):
         return True
-    
+
     # Check if it's one of your accepted emails (with or without aliases)
-    if '@' not in email:  
+    if '@' not in email:
         return False
-        
+
     local_part, domain = email.split('@', 1)  # Only split on first @
     base_email = f"{local_part.split('+')[0]}@{domain}"
-    
+
     return base_email in ACCEPTED_EMAILS
+
 
 def normalize_email(email):
     """Normalizes @cit.edu emails by removing + aliases."""
@@ -99,11 +105,11 @@ def register_user(request):
 
     if not is_accepted_email(email):  # Add this new function (shown below)
         return Response({'error': 'Only @cit.edu emails or pre-approved emails are allowed'},
-                    status=status.HTTP_400_BAD_REQUEST)
+                        status=status.HTTP_400_BAD_REQUEST)
 
     if not is_accepted_email(email):  # Add this new function (shown below)
         return Response({'error': 'Only @cit.edu emails or pre-approved emails are allowed'},
-                   status=status.HTTP_400_BAD_REQUEST)
+                        status=status.HTTP_400_BAD_REQUEST)
 
     password = data.get('password')
     first_name = data.get('first_name')
@@ -242,31 +248,40 @@ def logout_user(request):
     return response
 
 
-@api_view(['POST'])
-@auth_required()
 def update_password(request):
-    user: User = request.user
-    data = request.data
-    supabase = get_supabase_client()
-    current_password = data.get('current_password')
-    new_password = data.get('new_password')
+    if request.method == 'POST':
+        form = PasswordUpdateForm(request.POST)
+        if form.is_valid():
+            new_password = form.cleaned_data['new_password']
+            confirm_password = form.cleaned_data['confirm_password']
+            access_token = request.GET.get('access_token')  # Get the access token from the URL
 
-    try:
-        auth_response = supabase.auth.sign_in_with_password({
-            'email': user.email,
-            'password': current_password
-        })
-        supabase.auth.update_user({'password': new_password})
-    except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            # Check if passwords match
+            if new_password != confirm_password:
+                messages.error(request, "Passwords do not match.")
+            else:
+                # Use the access token to authenticate and update the user's password
+                supabase = get_supabase_client()
 
-    return_data = {
-        'message': 'Password updated successfully',
-        'jwt_token': auth_response.session.access_token,
-        'refresh_token': auth_response.session.refresh_token,
-    }
+                try:
+                    user = supabase.auth.api.get_user(access_token)
+                    if not user:
+                        messages.error(request, 'Invalid access token.')
+                    else:
+                        # Update the user's password
+                        supabase.auth.update_user({'password': new_password})
+                        messages.success(request, 'Your password has been updated successfully.')
+                        return redirect('login')  # Redirect to the login page after updating the password
+                except Exception as e:
+                    messages.error(request, f"Error: {str(e)}")
 
-    return Response(return_data, status=status.HTTP_200_OK)
+        else:
+            messages.error(request, 'Please ensure the form is valid.')
+
+    else:
+        form = PasswordUpdateForm()
+
+    return render(request, 'password_update_form.html', {'form': form})
 
 
 @api_view(['GET'])
@@ -289,10 +304,16 @@ def get_user_details(request):
 def reset_password(request):
     data = request.data
     email = data.get('email')
-    get_supabase_client().reset_password_email(
-        email=email,
-        options={'redirect_to': 'https://localhost:3000/update_password/'}
+    supabase = get_supabase_client()
+
+    supabase.auth.reset_password_for_email(
+        email,
+        {
+            "redirect_to": "http://localhost:8000/api/update-password",
+        }
     )
+
+    return Response({'message': 'Reset email was sent successfully'}, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])

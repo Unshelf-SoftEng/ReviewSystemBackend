@@ -47,7 +47,7 @@ class Subcategory(models.Model):
 
 
 class UserAbility(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='user_abilities')
     category = models.ForeignKey(Category, on_delete=models.CASCADE)
     irt_ability = models.FloatField(default=0)
     elo_ability = models.IntegerField(default=1500)
@@ -169,7 +169,7 @@ class Class(models.Model):
 class Lesson(models.Model):
     name = models.CharField(max_length=255)
     is_locked = models.BooleanField(default=False)
-    
+
     def __str__(self):
         return self.name
 
@@ -210,3 +210,12 @@ class LessonProgress(models.Model):
 
     def __str__(self):
         return f"{self.user.full_name} - {self.lesson.name} | Chapter: {self.current_chapter} | Section: {self.current_section}"
+
+
+class RLAgentState(models.Model):
+    state = models.JSONField()
+    model_weights = models.BinaryField()
+    memory = models.BinaryField(null=True, blank=True)
+
+    def __str__(self):
+        return "Global RL agent state"

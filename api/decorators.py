@@ -19,28 +19,14 @@ def auth_required(*allowed_roles):
                 return Response({'error': 'Authentication required. Please log in again'},
                                 status=status.HTTP_401_UNAUTHORIZED)
 
-            print('Token found')
-
             try:
                 if token:
                     try:
-
-                        print('Checking for user data')
                         user_data = supabase_client.auth.get_user(jwt=token)
 
-                        print("User Data:", user_data)
-
-
-
                         if user_data and user_data.user:
-
                             supabase_uid = user_data.user.id
-
-                            print("Supabase_uid", supabase_uid)
-
                             user = get_object_or_404(User, supabase_user_id=supabase_uid)
-
-
 
                             if allowed_roles and user.role not in allowed_roles:
                                 return Response({"error": "You are not allowed to access this resource"},
@@ -49,14 +35,10 @@ def auth_required(*allowed_roles):
                             request.user = user
                             return view_func(request, *args, **kwargs)
                     except AuthApiError as e:
-                        print('JWT Token Error', e)
                         if not refresh_token:
                             raise
-                else:
-                    print("JWT Token is not available")
 
                 if refresh_token:
-                    print("Refresh token", refresh_token)
                     try:
                         new_session = supabase_client.auth.refresh_session(refresh_token=refresh_token)
 
@@ -64,7 +46,6 @@ def auth_required(*allowed_roles):
                             return Response({'error': 'Session refresh failed'},
                                             status=status.HTTP_401_UNAUTHORIZED)
 
-                        print('Successfully refreshed session')
                         new_access_token = new_session.session.access_token
                         new_refresh_token = new_session.session.refresh_token
 
@@ -78,7 +59,6 @@ def auth_required(*allowed_roles):
                         request.user = user
                         response = view_func(request, *args, **kwargs)
 
-                        # Set new tokens in cookies
                         response.set_cookie(
                             key='access_token',
                             value=new_access_token,
@@ -96,7 +76,6 @@ def auth_required(*allowed_roles):
                         )
                         return response
                     except AuthApiError as e:
-                        print(f"AuthApiError: {str(e)}")
                         return Response({'error': 'Invalid refresh token'},
                                         status=status.HTTP_401_UNAUTHORIZED)
 
