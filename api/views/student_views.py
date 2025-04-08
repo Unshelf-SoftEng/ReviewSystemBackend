@@ -12,7 +12,7 @@ from django.shortcuts import get_object_or_404
 from api.decorators import auth_required
 from datetime import timedelta
 from django.utils.timezone import now
-from api.ai.rl_agent import DQNAgent, generate_quiz_with_rl
+from api.ai.rl_agent import DQNAgent, generate_quiz_with_rl, update_rl_model
 
 AUTO_SUBMISSION_GRACE_PERIOD = 30
 
@@ -504,7 +504,7 @@ def take_quiz(request):
 
     quiz.questions.set(selected_questions)
     quiz.selected_categories.set(categories)
-    # quiz.save()
+    quiz.save()
 
     AssessmentResult.objects.create(assessment=quiz, user=user, start_time=now())
 
@@ -513,6 +513,7 @@ def take_quiz(request):
         'questions': [
             {
                 'question_id': question.id,
+                'question_difficulty': question.elo_difficulty,
                 'image_url': question.image_url,
                 'question_text': question.question_text,
                 'choices': list(question.choices.values()),
@@ -842,6 +843,20 @@ def submit_assessment(request, assessment_id):
     result.score = score
     result.is_submitted = True
     result.save()
+
+    if request.data.get("add_rl"):
+
+        print('Calculating Transitions')
+
+        rl_agent = DQNAgent()
+        updated_abilities = update_rl_model(rl_agent, assessment_id=assessment_id, user=user)
+
+        user.abilities = updated_abilities
+        user.save()
+
+        rl_agent.save_state_to_db()
+
+
 
     return Response({'message': 'Assessment was submitted successfully'}, status=status.HTTP_201_CREATED)
 

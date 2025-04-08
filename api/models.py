@@ -47,7 +47,7 @@ class Subcategory(models.Model):
 
 
 class UserAbility(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='user_abilities')
     category = models.ForeignKey(Category, on_delete=models.CASCADE)
     irt_ability = models.FloatField(default=0)
     elo_ability = models.IntegerField(default=1500)
@@ -215,6 +215,7 @@ class LessonProgress(models.Model):
 class RLAgentState(models.Model):
     state = models.JSONField()
     model_weights = models.BinaryField()
+    memory = models.BinaryField(null=True, blank=True)
 
     def __str__(self):
         return "Global RL agent state"
