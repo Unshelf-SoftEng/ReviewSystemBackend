@@ -466,18 +466,14 @@ def take_quiz(request):
     no_of_questions = int(request.data.get('no_of_questions', 5))
     question_source = request.data.get('question_source')
 
-    # thirty_minutes_ago = now() - timedelta(minutes=30)
-    # recent_quiz = Assessment.objects.filter(created_by=user, created_at__gte=thirty_minutes_ago).exists()
-    #
-    # if recent_quiz:
-    #     return Response({'error': 'Student has already taken a quiz within 30 minutes. Please try again later!'},
-    #                     status=status.HTTP_429_TOO_MANY_REQUESTS)
+    waiting_time = now() - timedelta(minutes=15)
+    recent_quiz = Assessment.objects.filter(created_by=user, created_at__gte=waiting_time).exists()
+
+    if recent_quiz:
+        return Response({'error': 'Student has already taken a quiz within 15 minutes. Please try again later!'},
+                        status=status.HTTP_429_TOO_MANY_REQUESTS)
 
     if question_source == 'previous_exam':
-        all_questions = Question.objects.filter(category_id__in=selected_categories)
-        selected_questions = random.sample(list(all_questions), no_of_questions)
-
-    elif question_source == 'ai_generated':
         rl_agent = DQNAgent()
 
         categories = Category.objects.filter(id__in=selected_categories)
@@ -488,6 +484,10 @@ def take_quiz(request):
             elo_abilities[ability.category.name] = ability.elo_ability
 
         selected_questions = generate_quiz_with_rl(rl_agent, elo_abilities, categories, no_of_questions)
+
+    elif question_source == 'ai_generated':
+        return Response({'message': 'AI-generated questions feature has not been implemented yet.'},
+                        status=status.HTTP_501_NOT_IMPLEMENTED)
     else:
         return Response({'message': 'AI-generated questions feature has not been implemented yet.'},
                         status=status.HTTP_501_NOT_IMPLEMENTED)
@@ -513,7 +513,6 @@ def take_quiz(request):
         'questions': [
             {
                 'question_id': question.id,
-                'question_difficulty': question.elo_difficulty,
                 'image_url': question.image_url,
                 'question_text': question.question_text,
                 'choices': list(question.choices.values()),
@@ -527,48 +526,35 @@ def take_quiz(request):
 
 @api_view(['GET'])
 @auth_required("student")
-def lesson_assessment_limit(request, lesson_id):
-    user: User = request.user
-    lesson = get_object_or_404(Lesson, id=lesson_id)
-
-    attempts_count = AssessmentResult.objects.filter(
-        user=user,
-        assessment__lesson=lesson,
-        assessment__class_owner=user.enrolled_class
-    ).count()
-
-    max_attempts = 3
-    remaining_attempts = max(max_attempts - attempts_count, 0)
-
-    return Response({
-        "remaining_attempts": remaining_attempts,
-        "max_attempts": max_attempts
-    })
-
-
-@api_view(['GET'])
-@auth_required("student")
 def take_lesson_assessment(request, lesson_id):
     user: User = request.user
-    lesson = get_object_or_404(Lesson, id=lesson_id)
-    lesson_category = get_object_or_404(Category, name=lesson.name)
 
+    # waiting_time = now() - timedelta(minutes=15)
+    # recent_quiz = Assessment.objects.filter(created_by=user, created_at__gte=waiting_time).exists()
+    #
+    # if recent_quiz:
+    #     return Response({'error': 'Student has already taken a quiz within 15 minutes. Please try again later!'},
+    #                     status=status.HTTP_429_TOO_MANY_REQUESTS)
+
+    lesson = get_object_or_404(Lesson, id=lesson_id)
+
+    lesson_category = Category.objects.filter(name=lesson.name)
     attempts_count = AssessmentResult.objects.filter(
         user=user,
         assessment__lesson=lesson,
         assessment__class_owner=user.enrolled_class
     ).count()
 
-    max_attempts = 3
-    if attempts_count >= max_attempts:
-        return Response(
-            {"error": "Maximum of 3 quiz attempts reached."},
-            status=status.HTTP_403_FORBIDDEN
-        )
+    no_of_questions = 20
 
-    no_of_questions = 1
-    all_questions = list(Question.objects.filter(category_id=lesson_category.id))
-    selected_questions = random.sample(list(all_questions), no_of_questions)
+    rl_agent = DQNAgent()
+    user_abilities = UserAbility.objects.filter(user=user, category__in=lesson_category)
+
+    elo_abilities = {}
+    for ability in user_abilities:
+        elo_abilities[ability.category.name] = ability.elo_ability
+
+    selected_questions = generate_quiz_with_rl(rl_agent, elo_abilities, lesson_category, no_of_questions)
 
     lesson_assessment = Assessment.objects.create(
         name=f'Lesson Quiz: {lesson.name} Attempt {attempts_count + 1}',
@@ -579,7 +565,7 @@ def take_lesson_assessment(request, lesson_id):
         source='lesson_generated',
     )
 
-    lesson_assessment.selected_categories.set([lesson_category.id])
+    lesson_assessment.selected_categories.set([lesson_id])
     lesson_assessment.questions.set(selected_questions)
 
     quiz_data = {
@@ -844,19 +830,13 @@ def submit_assessment(request, assessment_id):
     result.is_submitted = True
     result.save()
 
-    if request.data.get("add_rl"):
+    rl_agent = DQNAgent()
+    updated_abilities = update_rl_model(rl_agent, assessment_id=assessment_id, user=user)
 
-        print('Calculating Transitions')
+    user.abilities = updated_abilities
+    user.save()
 
-        rl_agent = DQNAgent()
-        updated_abilities = update_rl_model(rl_agent, assessment_id=assessment_id, user=user)
-
-        user.abilities = updated_abilities
-        user.save()
-
-        rl_agent.save_state_to_db()
-
-
+    rl_agent.save_state_to_db()
 
     return Response({'message': 'Assessment was submitted successfully'}, status=status.HTTP_201_CREATED)
 
@@ -1064,6 +1044,7 @@ def get_assessment_result(request, assessment_id):
     }
 
     return Response(result_data, status=status.HTTP_200_OK)
+
 
 @api_view(['GET'])
 @auth_required("student")

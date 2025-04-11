@@ -7,6 +7,9 @@ from tensorflow.keras.layers import Dense
 from tensorflow.keras.optimizers import Adam
 from api.models import RLAgentState, Question, AssessmentResult, User, Category
 import random
+import os
+
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 
 
 class DQNAgent:
@@ -113,7 +116,7 @@ class DQNAgent:
 def generate_quiz_with_rl(rl_agent, abilities, categories, total_questions):
     all_questions = Question.objects.filter(category__in=categories)
     state_matrix = np.zeros((len(all_questions), 19))
-    ability_values = [abilities.get(cat.name, 0) for cat in categories[:9]]
+    ability_values = [abilities.get(cat.name, 0) for cat in categories]
 
     for i, q in enumerate(all_questions):
         state_matrix[i, :9] = ability_values
@@ -173,12 +176,9 @@ def update_rl_model(rl_agent, assessment_id, user, batch_size=32):
 
         state_transitions.append((state, reward))
 
-    print(state_transitions)
-
     for state, reward in state_transitions:
         next_state = state.copy()
         rl_agent.remember(state, reward, next_state, False)
 
     rl_agent.replay(batch_size)
     return ability_map
-
