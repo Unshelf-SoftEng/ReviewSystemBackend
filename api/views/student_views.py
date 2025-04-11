@@ -559,12 +559,12 @@ def take_lesson_assessment(request, lesson_id):
         assessment__class_owner=user.enrolled_class
     ).count()
 
-    max_attempts = 3
-    if attempts_count >= max_attempts:
-        return Response(
-            {"error": "Maximum of 3 quiz attempts reached."},
-            status=status.HTTP_403_FORBIDDEN
-        )
+    # max_attempts = 3
+    # if attempts_count >= max_attempts:
+    #     return Response(
+    #         {"error": "Maximum of 3 quiz attempts reached."},
+    #         status=status.HTTP_403_FORBIDDEN
+    #     )
 
     no_of_questions = 1
     all_questions = list(Question.objects.filter(category_id=lesson_category.id))
