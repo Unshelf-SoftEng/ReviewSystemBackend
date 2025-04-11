@@ -67,7 +67,7 @@ class Question(models.Model):
     category = models.ForeignKey(Category, related_name='questions', on_delete=models.CASCADE)
     subcategory = models.ForeignKey(Subcategory, related_name='questions', on_delete=models.CASCADE, blank=True,
                                     null=True)
-    ai_difficulty = models.IntegerField(blank=True, null=True)
+    difficulty = models.IntegerField(blank=True, null=True)
     irt_difficulty = models.FloatField(default=0)
     elo_difficulty = models.FloatField(default=1500)
     discrimination = models.FloatField(default=1.0)
