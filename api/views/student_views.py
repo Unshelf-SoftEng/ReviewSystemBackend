@@ -583,7 +583,7 @@ def take_lesson_assessment(request, lesson_id):
         source='lesson_generated',
     )
 
-    lesson_assessment.selected_categories.set([lesson_category.id])
+    lesson_assessment.selected_categories.set([lesson_id])
     lesson_assessment.questions.set(selected_questions)
 
     quiz_data = {

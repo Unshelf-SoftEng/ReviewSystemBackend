@@ -63,6 +63,16 @@ def upload_questions_from_sheet(spreadsheet_id, range_name):
             discrimination = float(row[11]) if len(row) > 11 else 1.0
             guessing = float(row[12]) if len(row) > 12 else 0.0
 
+            if difficulty == 1:
+                irt_difficulty = -1
+                elo_difficulty = 1250
+            elif difficulty == 2:
+                irt_difficulty = 0
+                elo_difficulty = 1500
+            else:
+                irt_difficulty = 1
+                elo_difficulty = 1750
+
             category_id = CATEGORY_MAPPING.get(category_name, None)
             if category_id is None:
                 print(f"Category '{category_name}' not found.")
@@ -81,7 +91,9 @@ def upload_questions_from_sheet(spreadsheet_id, range_name):
                     discrimination=discrimination,
                     guessing=guessing,
                     choices=choices,
-                    correct_answer=correct_answer
+                    correct_answer=correct_answer,
+                    elo_difficulty=elo_difficulty,
+                    irt_difficulty=irt_difficulty
                 )
 
                 print('Updated Question', question_id)
@@ -97,7 +109,9 @@ def upload_questions_from_sheet(spreadsheet_id, range_name):
                     discrimination=discrimination,
                     guessing=guessing,
                     choices=choices,
-                    correct_answer=correct_answer
+                    correct_answer=correct_answer,
+                    elo_difficulty = elo_difficulty,
+                    irt_difficulty = irt_difficulty
                 )
 
 
