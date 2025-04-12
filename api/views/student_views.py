@@ -591,6 +591,7 @@ def take_lesson_assessment(request, lesson_id):
         'questions': [
             {
                 'question_id': question.id,
+                'question_difficulty': question.elo_difficulty,
                 'image_url': question.image_url,
                 'question_text': question.question_text,
                 'choices': list(question.choices.values())

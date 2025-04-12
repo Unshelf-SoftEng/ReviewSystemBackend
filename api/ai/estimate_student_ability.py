@@ -91,7 +91,7 @@ def estimate_ability_elo(user_id):
     """
     Estimate and update student ability using the Elo rating system.
     """
-    k = 0.4
+    k = 32
     user = User.objects.get(pk=user_id)
     assessment = Assessment.objects.get(class_owner=user.enrolled_class, is_initial=True, is_active=True)
 
@@ -117,23 +117,23 @@ def estimate_ability_elo(user_id):
 
             for answer in answers:
 
-                difficulty = answer.question.ai_difficulty
+                difficulty = answer.question.difficulty
 
                 if difficulty == 1:
-                    adjusted_ai_difficulty = 1250
+                    adjusted_difficulty = 1250
                 elif difficulty == 2:
-                    adjusted_ai_difficulty = 1500
+                    adjusted_difficulty = 1500
                 else:
-                    adjusted_ai_difficulty = 1750
+                    adjusted_difficulty = 1750
 
-                expected_score = 1 / (1 + 10 ** ((adjusted_ai_difficulty - user_ability.elo_ability) / 400))
+                expected_score = 1 / (1 + 10 ** ((adjusted_difficulty - user_ability.elo_ability) / 400))
                 actual_score = 1 if answer.is_correct else 0
 
                 if user_ability.elo_ability is None:
                     user_ability.elo_ability = 1500
 
                 prev_ability = user_ability.elo_ability
-                user_ability.elo_ability += k * (actual_score - expected_score)
+                user_ability.elo_ability += round(k * (actual_score - expected_score))
                 new_ability = user_ability.elo_ability
 
                 print(f"Category: {category}, Prev Ability: {prev_ability}, New Ability: {new_ability}")

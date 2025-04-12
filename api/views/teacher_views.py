@@ -256,7 +256,12 @@ def create_assessment(request, class_id):
 @api_view(['GET'])
 @auth_required("teacher")
 def get_class_assessments(request, class_id):
-    assessments = Assessment.objects.filter(class_owner__id=class_id, is_active=True).order_by("-created_at")
+    assessments = Assessment.objects.filter(
+        class_owner__id=class_id,
+        is_active=True
+    ).exclude(
+        source="lesson_generated"
+    ).order_by("-created_at")
 
     assessments_data = []
 
@@ -714,8 +719,8 @@ def estimate_ability_students(request, class_id):
         assessment = Assessment.objects.filter(class_owner_id=class_id, is_initial=True).first()
         if AssessmentResult.objects.filter(assessment=assessment, user=student).exists():
             # estimate_ability_irt(student.id)
-            # estimate_ability_elo(student.id)
-            estimate_ability_elo_time(student.id)
+            estimate_ability_elo(student.id)
+            # estimate_ability_elo_time(student.id)
 
             user_abilities = UserAbility.objects.filter(user_id=student.id)
             irt_abilities = {
