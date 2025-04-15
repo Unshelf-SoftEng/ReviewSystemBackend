@@ -466,12 +466,12 @@ def take_quiz(request):
     no_of_questions = int(request.data.get('no_of_questions', 5))
     question_source = request.data.get('question_source')
 
-    waiting_time = now() - timedelta(minutes=15)
-    recent_quiz = Assessment.objects.filter(created_by=user, created_at__gte=fifteen_minutes_ago).exists()
+    # waiting_time = now() - timedelta(minutes=15)
+    # recent_quiz = Assessment.objects.filter(created_by=user, created_at__gte=fifteen_minutes_ago).exists()
 
-    if recent_quiz:
-        return Response({'error': 'Student has already taken a quiz within 15 minutes. Please try again later!'},
-                        status=status.HTTP_429_TOO_MANY_REQUESTS)
+    # if recent_quiz:
+    #     return Response({'error': 'Student has already taken a quiz within 15 minutes. Please try again later!'},
+    #                     status=status.HTTP_429_TOO_MANY_REQUESTS)
 
     if question_source == 'previous_exam':
         rl_agent = DQNAgent()
@@ -546,12 +546,12 @@ def lesson_assessment_limit(request, lesson_id):
 def take_lesson_assessment(request, lesson_id):
     user: User = request.user
 
-    waiting_time = now() - timedelta(minutes=15)
-    recent_quiz = Assessment.objects.filter(created_by=user, created_at__gte=fifteen_minutes_ago).exists()
+    # waiting_time = now() - timedelta(minutes=15)
+    # recent_quiz = Assessment.objects.filter(created_by=user, created_at__gte=fifteen_minutes_ago).exists()
 
-    if recent_quiz:
-        return Response({'error': 'Student has already taken a quiz within 15 minutes. Please try again later!'},
-                        status=status.HTTP_429_TOO_MANY_REQUESTS)
+    # if recent_quiz:
+    #     return Response({'error': 'Student has already taken a quiz within 15 minutes. Please try again later!'},
+    #                     status=status.HTTP_429_TOO_MANY_REQUESTS)
 
     lesson = get_object_or_404(Lesson, id=lesson_id)
     lesson_category = Category.objects.filter(name=lesson.name)
