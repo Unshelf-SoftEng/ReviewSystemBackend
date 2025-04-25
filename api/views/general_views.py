@@ -308,7 +308,7 @@ def reset_password(request):
     supabase.auth.reset_password_for_email(
         email,
         {
-            "redirect_to": "http://localhost:5173/password-update",
+            "redirect_to": "https://nits-adaptive-nine.vercel.app/update-password",
         }
     )
 
