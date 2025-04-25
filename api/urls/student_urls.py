@@ -29,4 +29,7 @@ urlpatterns = [
     path('lesson/<int:lesson_id>', student_views.get_lesson, name='get_lesson'),
     path('take-lesson-assessment/<int:lesson_id>', student_views.take_lesson_assessment, name='take_lesson_assessment'),
     path('take-chapter-assessment/<int:chapter_id>', student_views.take_chapter_assessment, name='take_chapter_assessment'),
+    path('final-exam', student_views.get_final_exam, name='get_final_exam'),
+    path('take-final-exam', student_views.take_final_exam, name='take_final_exam'),
+    path('final-exam-taken', student_views.final_exam_taken, name='final_exam_taken'),
 ]

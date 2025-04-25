@@ -129,7 +129,8 @@ def get_dashboard_data(request):
             'question_source': result.assessment.question_source,
             'source': result.assessment.source,
             'categories': categories,
-            'is_initial_assessment': result.assessment.is_initial
+            'is_initial_assessment': result.assessment.is_initial,
+            'is_final_assessment': result.assessment.is_final
         }
         history_data.append(item)
 
@@ -467,7 +468,7 @@ def take_quiz(request):
     question_source = request.data.get('question_source')
 
     waiting_time = now() - timedelta(minutes=15)
-    recent_quiz = Assessment.objects.filter(created_by=user, created_at__gte=fifteen_minutes_ago).exists()
+    recent_quiz = Assessment.objects.filter(created_by=user, created_at__gte=waiting_time).exists()
 
     if recent_quiz:
         return Response({'error': 'Student has already taken a quiz within 15 minutes. Please try again later!'},
@@ -547,7 +548,7 @@ def take_lesson_assessment(request, lesson_id):
     user: User = request.user
 
     waiting_time = now() - timedelta(minutes=15)
-    recent_quiz = Assessment.objects.filter(created_by=user, created_at__gte=fifteen_minutes_ago).exists()
+    recent_quiz = Assessment.objects.filter(created_by=user, created_at__gte=waiting_time).exists()
 
     if recent_quiz:
         return Response({'error': 'Student has already taken a quiz within 15 minutes. Please try again later!'},
@@ -850,7 +851,6 @@ def submit_assessment(request, assessment_id):
     result.save()
 
     if request.data.get("add_rl"):
-
         print('Calculating Transitions')
 
         rl_agent = DQNAgent()
@@ -860,8 +860,6 @@ def submit_assessment(request, assessment_id):
         user.save()
 
         rl_agent.save_state_to_db()
-
-
 
     return Response({'message': 'Assessment was submitted successfully'}, status=status.HTTP_201_CREATED)
 
@@ -1069,6 +1067,7 @@ def get_assessment_result(request, assessment_id):
     }
 
     return Response(result_data, status=status.HTTP_200_OK)
+
 
 @api_view(['GET'])
 @auth_required("student")
@@ -1446,3 +1445,148 @@ def update_lesson_progress(request, lesson_id):
     lesson_progress.save()
 
     return Response({"message": "Lesson progress updated successfully."}, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@auth_required("student")
+def get_final_exam(request):
+    user: User = request.user
+
+    if user.enrolled_class is None:
+        return Response({"error": "Student is not enrolled to a class"}, status=status.HTTP_403_FORBIDDEN)
+
+    exam = get_object_or_404(Assessment, class_owner=user.enrolled_class, is_final=True)
+
+    exam_data = {
+        'exam_id': exam.id,
+        'is_open': exam.deadline is not None,
+    }
+
+    if exam.deadline:
+        exam_data['deadline'] = exam.deadline
+
+    return Response(exam_data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@auth_required("student")
+def final_exam_taken(request):
+    user: User = request.user
+
+    if not user.enrolled_class:
+        return Response({"error": "Student is not enrolled to a class"}, status=status.HTTP_403_FORBIDDEN)
+
+    result = AssessmentResult.objects.filter(
+        assessment__class_owner=user.enrolled_class,
+        assessment__is_final=True,
+        user=user
+    ).first()
+
+    if not result:
+        return Response({'status': 'not_taken'}, status=status.HTTP_200_OK)
+
+    if result.is_submitted:
+        return Response({'status': 'taken'}, status=status.HTTP_200_OK)
+
+    current_time = timezone.now()
+    time_limit_end = result.start_time + timedelta(seconds=result.assessment.time_limit)
+    deadline = result.assessment.deadline
+
+    if current_time >= time_limit_end or (deadline and current_time >= deadline):
+        result.is_submitted = True
+        result.save()
+        return Response({'status': 'taken'}, status=status.HTTP_200_OK)
+    else:
+        return Response({'status': 'ongoing'}, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@auth_required("student")
+def take_final_exam(request):
+    user: User = request.user
+
+    if user.enrolled_class is None:
+        return Response({'error': "Student is not enrolled in any class"}, status=status.HTTP_403_FORBIDDEN)
+
+    exam = Assessment.objects.filter(
+        class_owner=user.enrolled_class,
+        is_final=True,
+        is_active=True
+    ).select_related("class_owner").prefetch_related("questions").only("id", "time_limit", "deadline",
+                                                                       "class_owner").first()
+
+    if not exam:
+        return Response({"error": "Final Exam doesn't exist"}, status=status.HTTP_404_NOT_FOUND)
+
+    if not exam.deadline:
+        return Response({'error': 'Final Exam is not open'}, status=status.HTTP_400_BAD_REQUEST)
+
+    current_time = timezone.now()
+
+    if exam.deadline < current_time:
+        return Response({'error': 'Final Exam deadline has already passed'}, status=status.HTTP_400_BAD_REQUEST)
+
+    result, created = AssessmentResult.objects.get_or_create(
+        assessment=exam, user=user,
+        defaults={"start_time": current_time}
+    )
+
+    expected_end_time = result.start_time + timedelta(seconds=exam.time_limit)
+    end_time = min(expected_end_time, exam.deadline)
+    remaining_time = (end_time - current_time).total_seconds()
+
+    if remaining_time <= 0:
+        return Response({'error': 'Time limit has exceeded'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if result.is_submitted:
+        return Response({'error': 'Student has already taken the exam.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    questions_qs = exam.questions.all().values("id", "image_url", "question_text", "choices")
+    questions_dict = {q["id"]: q for q in questions_qs}
+
+    if not result.question_order:
+        question_list = list(questions_dict.values())
+        random.shuffle(question_list)
+        result.question_order = [q["id"] for q in question_list]
+        result.save()
+    else:
+        question_list = [questions_dict[qid] for qid in result.question_order if qid in questions_dict]
+
+    answers = Answer.objects.filter(assessment_result=result)
+
+    answers_dict = {
+        answer.question_id: {
+            'chosen_answer': answer.chosen_answer,
+            'time_spent': answer.time_spent
+        }
+        for answer in answers
+    }
+
+    questions_data = []
+    for question in question_list:
+        question_data = {
+            'question_id': question["id"],
+            'image_url': question["image_url"],
+            'question_text': question["question_text"],
+            'choices': question["choices"] if isinstance(question["choices"], list)
+            else list(question["choices"].values()),
+        }
+
+        answer_info = answers_dict.get(question["id"], {})
+        if 'chosen_answer' in answer_info:
+            question_data.update({
+                'chosen_answer': answer_info['chosen_answer'],
+                'time_spent': answer_info.get('time_spent', 0),
+            })
+
+        questions_data.append(question_data)
+
+    exam_data = {
+        'exam_id': exam.id,
+        'no_of_items': len(question_list),
+        'time_limit': int(remaining_time),
+        'questions': questions_data,
+        'question_ids': [q["id"] for q in question_list],
+    }
+
+    return Response(exam_data, status=status.HTTP_200_OK)

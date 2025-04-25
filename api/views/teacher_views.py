@@ -46,6 +46,42 @@ def create_initial_assessment(request, class_id):
     return Response({"message": "Assessment created"}, status=status.HTTP_201_CREATED)
 
 
+@api_view(['GET'])
+@auth_required("teacher")
+def create_final_assessment(request, class_id):
+    file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "question_ids.txt")
+    try:
+        with open(file_path, "r") as file:
+            question_ids = [line.strip() for line in file if line.strip()]
+    except FileNotFoundError:
+        return Response({'error': 'Question ID file not found'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    if Assessment.objects.filter(class_owner__id=class_id, is_final=True).exists():
+        return Response({'error': 'Final Assessment already exists'}, status=status.HTTP_400_BAD_REQUEST)
+
+    assessment = Assessment.objects.create(
+        name='Final Assessment',
+        class_owner=Class.objects.get(pk=class_id),
+        type='exam',
+        question_source='previous_exam',
+        source='admin_generated',
+        time_limit=8100,
+        is_final=True,
+    )
+
+    questions = Question.objects.filter(pk__in=question_ids)
+
+    selected_categories = []
+    for question in questions:
+        if question.category not in selected_categories:
+            selected_categories.append(question.category)
+
+    assessment.selected_categories.set(selected_categories)
+    assessment.questions.set(questions)
+
+    return Response({"message": "Final Assessment created"}, status=status.HTTP_201_CREATED)
+
+
 @api_view(['POST'])
 @auth_required("teacher")
 def create_class(request):
