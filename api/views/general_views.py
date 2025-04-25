@@ -300,7 +300,6 @@ def get_user_details(request):
 
 
 @api_view(['POST'])
-@auth_required()
 def reset_password(request):
     data = request.data
     email = data.get('email')
