@@ -305,6 +305,8 @@ def reset_password(request):
     email = data.get('email')
     supabase = get_supabase_client()
 
+    verified = supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'email'})
+
     supabase.auth.reset_password_for_email(
         email,
         {
@@ -312,7 +314,7 @@ def reset_password(request):
         }
     )
 
-    return Response({'message': 'Reset email was sent successfully'}, status=status.HTTP_200_OK)
+    return Response({'message': 'Reset email was sent successfully', 'verified': verified}, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
