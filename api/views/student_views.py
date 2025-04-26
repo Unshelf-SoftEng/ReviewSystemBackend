@@ -1074,19 +1074,16 @@ def get_assessment_result(request, assessment_id):
 def get_class_assessment_result(request, assessment_id):
     user: User = request.user
 
-    # Get the assessment and verify student access
     assessment = get_object_or_404(
         Assessment.objects.select_related('class_owner'),
         id=assessment_id,
         is_active=True
     )
 
-    # Verify student belongs to the class
     if user.enrolled_class != assessment.class_owner:
         return Response({'error': 'You are not enrolled in this class'},
                         status=status.HTTP_403_FORBIDDEN)
 
-    # Get all attempts for this student (max 3)
     attempts = AssessmentResult.objects.filter(
         assessment=assessment,
         user=user
@@ -1096,7 +1093,6 @@ def get_class_assessment_result(request, assessment_id):
         return Response({'error': 'No attempts found for this assessment'},
                         status=status.HTTP_404_NOT_FOUND)
 
-    # Prefetch related data for all attempts
     attempts = attempts.prefetch_related(
         Prefetch('answers', queryset=Answer.objects.select_related('question__category')),
         Prefetch('assessment__questions', queryset=Question.objects.select_related('category'))
@@ -1109,7 +1105,6 @@ def get_class_assessment_result(request, assessment_id):
         answer_dict = {ans.question.id: ans for ans in answers}
         questions = attempt.assessment.questions.all()
 
-        # Calculate statistics for this attempt
         overall_correct = 0
         overall_wrong = 0
         category_stats = defaultdict(lambda: {'total_questions': 0, 'correct': 0, 'wrong': 0})
@@ -1148,7 +1143,6 @@ def get_class_assessment_result(request, assessment_id):
                     'time_spent': None,
                 })
 
-        # Calculate time taken for this attempt
         if attempt.time_taken:
             time_taken = attempt.time_taken
         else:
@@ -1175,7 +1169,6 @@ def get_class_assessment_result(request, assessment_id):
             'answers': serialized_answers
         })
 
-    # Sort attempts from latest to oldest
     attempt_data.reverse()
 
     response_data = {
