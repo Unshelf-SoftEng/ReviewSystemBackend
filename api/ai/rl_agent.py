@@ -171,6 +171,7 @@ def update_rl_model(rl_agent, assessment_id, user, batch_size=32):
         total_reward += reward
 
         # Update UserAbility's Elo rating
+        print('Update user elo rating');
         user_ability.elo_ability = round(user_elo + reward)
         user_ability.save()  # Save immediately
 

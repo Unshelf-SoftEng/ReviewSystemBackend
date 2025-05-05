@@ -850,16 +850,13 @@ def submit_assessment(request, assessment_id):
     result.is_submitted = True
     result.save()
 
-    if request.data.get("add_rl"):
-        print('Calculating Transitions')
+    rl_agent = DQNAgent()
+    updated_abilities = update_rl_model(rl_agent, assessment_id=assessment_id, user=user)
 
-        rl_agent = DQNAgent()
-        updated_abilities = update_rl_model(rl_agent, assessment_id=assessment_id, user=user)
+    user.abilities = updated_abilities
+    user.save()
 
-        user.abilities = updated_abilities
-        user.save()
-
-        rl_agent.save_state_to_db()
+    rl_agent.save_state_to_db()
 
     return Response({'message': 'Assessment was submitted successfully'}, status=status.HTTP_201_CREATED)
 
